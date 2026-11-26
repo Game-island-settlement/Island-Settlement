@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Island Settlement</title>
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Island"><link rel="apple-touch-icon" href="icon.png"><link rel="icon" href="icon.png">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0f172a;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#e2e8f0}
+  #canvas-container{position:fixed;inset:0}
+  #country-header{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:18px;align-items:center;flex-wrap:wrap;justify-content:center;padding:10px 18px;background:rgba(15,23,42,.82);border:1px solid #334155;border-radius:14px;backdrop-filter:blur(6px);font-size:14px;max-width:70vw}
+  #country-header .stat{display:flex;flex-direction:column;align-items:center;min-width:64px}
+  #country-header .stat b{font-size:18px}
+  #country-header small{color:#94a3b8;font-size:11px}
+  #rank-badge{font-weight:600;color:#fde047}
+  #toolbar{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:10px;background:rgba(15,23,42,.85);border:1px solid #334155;border-radius:14px;backdrop-filter:blur(6px);max-width:96vw;flex-wrap:wrap;justify-content:center}
+  .build-btn{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:10px;padding:8px 12px;cursor:pointer;font-size:13px;line-height:1.3;text-align:center}
+  .build-btn small{display:block;color:#94a3b8;font-size:11px}
+  .build-btn:hover{background:#334155}
+  .build-btn.active{border-color:#38bdf8;background:#0c4a6e}
+  #nation-name{background:#1e293b;border:1px solid #facc15;color:#fde047;border-radius:8px;padding:5px 8px;font:600 14px system-ui;width:130px;text-align:center}
+  #tip{position:fixed;top:78px;left:50%;transform:translateX(-50%);font-size:12px;color:#cbd5e1;background:rgba(15,23,42,.7);border-radius:8px;padding:3px 10px;pointer-events:none;min-height:16px}
+  #toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);background:#7f1d1d;color:#fecaca;border-radius:8px;padding:6px 14px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none}
+  #minimap{position:fixed;left:14px;bottom:14px;width:260px;height:152px;border:2px solid #334155;border-radius:10px;overflow:hidden;background:#0c4a6e;cursor:crosshair;touch-action:none}
+  #minimap canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+  #mm-dot{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #000;pointer-events:none}
+  #home-btn{position:fixed;right:14px;bottom:14px;background:rgba(15,23,42,.88);color:#fde047;border:1px solid #facc15;border-radius:10px;padding:10px 14px;cursor:pointer;font:600 13px system-ui;z-index:5}
+  #home-btn:hover{background:#422006}
+  .mm-ping{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;border:2px solid #fff;pointer-events:none;animation:mmping 1.2s ease-out forwards}
+  @keyframes mmping{from{transform:scale(.4);opacity:1}to{transform:scale(3.5);opacity:0}}
+  #wizard{position:fixed;inset:0;z-index:30;background:rgba(2,6,23,.78);display:flex;align-items:center;justify-content:center;padding:12px}
+  #wizard[hidden]{display:none}
+  .wz{background:#0f172a;border:2px solid #facc15;border-radius:14px;width:min(760px,96vw);max-height:94vh;overflow:auto;padding:14px 16px;font-size:13px;color:#e2e8f0}
+  .wz-h{display:flex;justify-content:space-between;align-items:center;font-size:15px}
+  .wz-h button{background:none;border:0;color:#94a3b8;font-size:18px;cursor:pointer}
+  .wz-title{margin:6px 0 4px;color:#fde047;font-weight:700}
+  .wz-dots{display:flex;gap:6px;margin-bottom:10px}
+  .wz-dots i{width:22px;height:5px;border-radius:3px;background:#334155}
+  .wz-dots i.on{background:#facc15}.wz-dots i.done{background:#a16207}
+  .wz-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:14px}
+  @media(max-width:620px){.wz-grid{grid-template-columns:1fr}}
+  .wz-form label{display:block;margin:10px 0 4px;color:#94a3b8;font-weight:600}
+  .wz-form input{width:100%;box-sizing:border-box;background:#1e293b;border:1px solid #475569;color:#f8fafc;border-radius:8px;padding:8px 10px;font:14px system-ui}
+  .wz-row{display:flex;gap:6px}.wz-row input{flex:1}
+  .wz button{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:8px;padding:7px 11px;cursor:pointer;font:13px system-ui}
+  .wz button:hover{background:#334155}.wz button:disabled{opacity:.4;cursor:default}
+  .wz-opts{display:flex;flex-wrap:wrap;gap:6px}
+  .wz-opts .opt{text-align:left}.wz-opts .opt small{display:block;color:#94a3b8;font-size:10px;margin-top:2px}
+  .wz-opts.icons .opt{padding:5px 9px;font-size:16px;text-align:center}
+  .wz .opt.on{border-color:#facc15;background:#422006}
+  .wz-sw{display:flex;flex-wrap:wrap;gap:6px}
+  .wz .sw{width:26px;height:26px;border-radius:50%;padding:0;border:2px solid #475569}
+  .wz .sw.on{border-color:#fff;box-shadow:0 0 0 2px #facc15}
+  .wz-prev{background:#111c33;border:1px solid #334155;border-radius:12px;padding:10px;text-align:center;align-self:start}
+  .wz-card{display:flex;align-items:center;gap:10px;text-align:left}
+  .wz-name{font-size:16px}.wz-card i{color:#94a3b8;font-size:12px}
+  .wz-art{margin-top:8px;background:#0b1224;border-radius:10px;padding:4px}
+  .wz-sum{margin-top:6px;color:#cbd5e1;font-size:12px}
+  .wz-stats{display:flex;flex-direction:column;gap:3px;margin-top:8px;text-align:left}
+  .wz-foot{display:flex;justify-content:space-between;margin-top:14px}
+  .wz .go{background:#a16207;border-color:#facc15;color:#fff;font-weight:700}
+  .wz .bad{color:#fca5a5}
+  .row.brand .ic.big{width:48px}
+  .sbtns{display:flex;gap:5px;align-items:center}.sbtns.wide{margin-top:6px}
+  .codebox textarea{width:100%;height:84px;box-sizing:border-box;background:#0b1224;color:#cbd5e1;border:1px solid #475569;border-radius:8px;font:11px monospace;padding:6px}
+  #popup .g{color:#86efac}#popup .r{color:#fca5a5}
+  .pwr{display:block;margin:4px 0;font-size:12px;color:#cbd5e1}
+  #hint{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);font-size:12px;color:#94a3b8;pointer-events:none;text-align:center}
+  #menu{position:fixed;top:12px;right:12px;display:flex;gap:6px}
+  #menu button{background:rgba(15,23,42,.88);color:#e2e8f0;border:1px solid #475569;border-radius:10px;padding:8px 11px;font-size:13px;cursor:pointer}
+  #menu button:hover{background:#334155} #menu button.active{border-color:#38bdf8;background:#0c4a6e}
+  #panel{position:fixed;top:56px;right:12px;width:min(400px,94vw);max-height:calc(100vh - 160px);display:flex;flex-direction:column;background:rgba(15,23,42,.94);border:1px solid #334155;border-radius:14px;font-size:13px}
+  #panel[hidden],#popup[hidden]{display:none}
+  #panel-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #334155}
+  #panel-head button{background:none;border:none;color:#94a3b8;font-size:16px;cursor:pointer}
+  #panel-body{overflow:auto;padding:8px 10px 12px}
+  .sub{color:#94a3b8;padding:6px 4px;line-height:1.5} .sub b{color:#e2e8f0}
+  .row{display:flex;gap:8px;align-items:center;padding:7px 6px;border-bottom:1px solid #1e293b} .row .ic{font-size:22px;width:30px;text-align:center} .grow{flex:1;min-width:0} .row small{color:#94a3b8}
+  .row.war{background:rgba(127,29,29,.35);border-radius:8px}
+  .tag{background:#1e293b;border-radius:6px;padding:1px 6px;font-size:11px;color:#cbd5e1}
+  .ab{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:8px;padding:5px 9px;font-size:12px;cursor:pointer;white-space:nowrap}
+  .ab:hover:not([disabled]){background:#334155} .ab[disabled]{opacity:.4;cursor:default}
+  table{width:100%;border-collapse:collapse;font-size:12px} th{position:sticky;top:-8px;background:#0f172a;text-align:right;padding:5px 4px;cursor:pointer;color:#94a3b8;font-weight:600} th:first-child,td:first-child{text-align:left}
+  td{padding:4px;text-align:right;border-bottom:1px solid #1e293b;white-space:nowrap} tr[data-act=sel]{cursor:pointer} tr[data-act=sel]:hover{background:#1e293b}
+  tr.me td{color:#fde047} tr.ally td{color:#86efac} tr.war td{color:#fca5a5} tr.sel{background:#0c4a6e}
+  td i,.ch i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+  .card{background:#111c33;border:1px solid #334155;border-radius:10px;padding:10px;margin-bottom:10px;line-height:1.5} .ch{font-size:15px;margin-bottom:4px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin:6px 0} .odds{margin:6px 0} .g{color:#86efac} .r{color:#fca5a5}
+  .btns2{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .log{padding:5px 4px;border-bottom:1px solid #1e293b} .log small{color:#64748b;margin-right:6px} .log.war{color:#fca5a5} .log.peace{color:#86efac}
+  #popup{position:fixed;top:140px;left:50%;transform:translateX(-50%);z-index:20;background:#0f172a;border:2px solid #facc15;border-radius:12px;padding:14px 18px;max-width:min(420px,92vw);font-size:14px;line-height:1.5;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+  #popup .btns{display:flex;gap:8px;margin-top:10px} #popup button{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:8px;padding:6px 12px;cursor:pointer}
+</style>
+<script>
+// Loader: pick a CDN that works, register the import map, then start the game module (so exported/offline-opened copies fail loudly instead of showing a blank blue screen)
+(function () {
+  var BASES = ['https://cdn.jsdelivr.net/npm/three@0.160.0/', 'https://fastly.jsdelivr.net/npm/three@0.160.0/', 'https://unpkg.com/three@0.160.0/'];
+  function fail(msg) {
+    var d = document.createElement('div');
+    d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0b1e33;color:#fff;font:16px system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px';
+    d.innerHTML = '<div style="max-width:520px"><h2>Could not start the game</h2><p>' + msg + '</p><p style="opacity:.7;font-size:13px">The game loads the Three.js 3D library from the internet, so an internet connection is needed (the exported file works when online).</p><button onclick="location.reload()" style="padding:10px 18px;font-size:15px">Retry</button></div>';
+    (document.body || document.documentElement).appendChild(d);
+  }
+  window.addEventListener('error', function (e) { if (!window.__gameUp) console.error(e.message); });
+  window.addEventListener('unhandledrejection', function (e) { if (!window.__gameUp) console.error(String(e.reason)); });
+  function probe(i) {
+    if (i >= BASES.length) { fail('None of the 3D library servers could be reached.'); return; }
+    var b = BASES[i];
+    // probe with a classic <script> (small file): it must NOT be a module load, because an import map is ignored once any module has started loading
+    var p = document.createElement('script'), done = false;
+    var go = function (ok) {
+      if (done) return; done = true; p.remove();
+      if (!ok) { probe(i + 1); return; }
+      var m = document.createElement('script'); m.type = 'importmap';
+      m.textContent = JSON.stringify({ imports: { three: b + 'build/three.module.js', 'three/addons/': b + 'examples/jsm/' } });
+      document.head.appendChild(m);
+      var g = document.createElement('script'); g.type = 'module';
+      g.textContent = document.getElementById('game-src').textContent;
+      document.body.appendChild(g);
+      setTimeout(function () { if (!window.__gameUp) fail('The game started loading but did not finish (check your connection, or press F12 and send me the red error).'); }, 25000);
+    };
+    p.onload = function () { go(true); }; p.onerror = function () { go(false); };
+    setTimeout(function () { go(false); }, 8000);
+    p.src = b + 'examples/jsm/controls/OrbitControls.js';
+    document.head.appendChild(p);
+  }
+  window.addEventListener('DOMContentLoaded', function () { probe(0); });
+})();
+</script>
+</head>
+<body>
+<noscript><div style="position:fixed;inset:0;z-index:99999;background:#0b1e33;color:#fff;font:18px system-ui;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px">This game needs JavaScript. If you are previewing the file (e.g. in the Files app), open it in Safari instead, or use the artifact link.</div></noscript>
+<div id="canvas-container"></div>
+<div id="country-header">
+  <input id="nation-name" value="" maxlength="22" spellcheck="false" title="Rename your nation">
+  <span id="rank-badge">Settlement: Outpost</span>
+  <div class="stat"><b id="gold-val">0</b><small>Gold <span id="gold-rate">+0/s</span></small></div>
+  <div class="stat"><b id="wood-val">0</b><small>Wood <span id="wood-rate">+0/s</span></small></div>
+  <div class="stat"><b id="pop-val">0</b><small>Pop <span id="pop-cap">Cap: 0</span></small></div>
+  <div class="stat"><b id="inf-val">0</b><small>Influence</small></div>
+  <div class="stat"><b id="mil-val">0</b><small>Military</small></div>
+</div>
+<button id="home-btn" title="Fly back to your capital (H)">🏠 My country</button>
+<div id="menu"><button data-tab="companies">🏢 Companies</button><button data-tab="military">🪖 Military</button><button data-tab="nations">🌍 Nations</button><button data-tab="log">📰 News</button><button data-tab="saves">💾 Saves</button></div>
+<div id="panel" hidden><div id="panel-head"><b id="panel-title"></b><button id="panel-close">✕</button></div><div id="panel-body"></div></div>
+<div id="wizard" hidden></div>
+<div id="popup" hidden></div>
+<div id="tip"></div><div id="toast"></div>
+<div id="minimap"><canvas id="mm-canvas"></canvas><div id="mm-dot"></div></div>
+<div id="hint">Left-click a tile to build · drag to orbit · scroll to zoom</div>
+<div id="toolbar">
+  <button class="build-btn active" data-type="house">🏠 House<small>30g 20w</small></button>
+  <button class="build-btn" data-type="lumber">🪵 Lumber<small>40g 10w</small></button>
+  <button class="build-btn" data-type="market">🏪 Market<small>60g 40w</small></button>
+  <button class="build-btn" data-type="tower">🔮 Tower<small>120g 80w</small></button>
+  <button class="build-btn" data-type="demolish">🧨 Demolish<small>free</small></button>
+</div>
+<script type="text/plain" id="game-src">
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+let state = {
+  gold: 300, wood: 100, pop: 10, popCap: 10,
+  influence: 0, goldRate: 0, woodRate: 0, selectedTool: 'house'
+};
+
+const BUILDINGS = {
+  house:  { gold: 30,  wood: 20, popCap: 15, goldRate: 0, woodRate: 0, inf: 5 },
+  lumber: { gold: 40,  wood: 10, popCap: 0,  goldRate: 0, woodRate: 3, inf: 10 },
+  market: { gold: 60,  wood: 40, popCap: 0,  goldRate: 4, woodRate: 0, inf: 15 },
+  tower:  { gold: 120, wood: 80, popCap: 5,  goldRate: 2, woodRate: 0, inf: 50 }
+};
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function makeNoise(rand){
+  const lat=new Float32Array(256*256);
+  for(let i=0;i<lat.length;i++)lat[i]=rand();
+  const s=t=>t*t*(3-2*t);
+  const at=(x,y)=>lat[((y&255)<<8)|(x&255)];
+  return (x,y)=>{
+    const xi=Math.floor(x),yi=Math.floor(y),xf=s(x-xi),yf=s(y-yi);
+    const a=at(xi,yi),b=at(xi+1,yi),c=at(xi,yi+1),d=at(xi+1,yi+1);
+    return a+(b-a)*xf+(c-a)*yf+(a-b-c+d)*xf*yf;
+  };
+}
+function fbm(n,x,y,o=5){let v=0,a=0.5,f=1,sum=0;for(let i=0;i<o;i++){v+=n(x*f,y*f)*a;sum+=a;a*=0.5;f*=2;}return v/sum;}
+// Terrain, 8 continents, ~200 countries. Pure data, no rendering.
+const CONTINENT_NAMES=['Veridia','Norvaland','Solara','Ymiria','Atlantica','Zephyria','Kharos','Oceanor'];
+function generateWorld(W,H,rand,targetCountries=200){
+  const nWarp=makeNoise(rand), nWarp2=makeNoise(rand), nCoast=makeNoise(rand), nElev=makeNoise(rand), nRiver=makeNoise(rand), nRidge=makeNoise(rand), nCost=makeNoise(rand), N=W*H;
+  // 4x2 grid of continents with jittered centres and sizes
+  const cw=W/4, ch=H/2, conts=[];
+  for(let r=0;r<2;r++)for(let c=0;c<4;c++)conts.push({
+    cx:(c+0.5)*cw+(rand()-0.5)*cw*0.4, cz:(r+0.5)*ch+(rand()-0.5)*ch*0.3,
+    rx:cw*(0.30+rand()*0.22), rz:ch*(0.28+rand()*0.24), col:c, row:r
+  });
+  // land bridges join some neighbouring continents (Eurasia / Americas style); others stay separate
+  const pairs=[];
+  for(let r=0;r<2;r++)for(let c=0;c<4;c++){const k=r*4+c;if(c<3)pairs.push([k,k+1]);if(r<1)pairs.push([k,k+4]);}
+  for(let k=pairs.length-1;k>0;k--){const j=(rand()*(k+1))|0;[pairs[k],pairs[j]]=[pairs[j],pairs[k]];}
+  const bridges=pairs.slice(0,3+((rand()*2)|0)).map(([a,b])=>({a:conts[a],b:conts[b],hw:20+rand()*12}));
+  // a few island chains in the gaps, tagged with the nearest continent
+  const shapes=[];
+  conts.forEach((q,k)=>{
+    shapes.push({cx:q.cx,cz:q.cz,rx:q.rx*0.75,rz:q.rz*0.75,id:k});
+    const n=3+((rand()*3)|0);       // 3-5 lobes -> peninsulas, bulges, bays instead of a clean ellipse
+    for(let l=0;l<n;l++){
+      const a=rand()*6.283,rr=0.3+rand()*0.55;
+      shapes.push({cx:q.cx+Math.cos(a)*q.rx*rr,cz:q.cz+Math.sin(a)*q.rz*rr,rx:q.rx*(0.3+rand()*0.4),rz:q.rz*(0.3+rand()*0.4),id:k});
+    }
+  });
+  for(let n=0;n<14;n++){
+    const cx=rand()*W,cz=rand()*H;let bk=0,bd=1e9;
+    conts.forEach((q,k)=>{const d=Math.hypot(cx-q.cx,cz-q.cz);if(d<bd){bd=d;bk=k;}});
+    shapes.push({cx,cz,rx:6+rand()*10,rz:5+rand()*8,id:bk});
+  }
+  const v=new Float32Array(N), e=new Float32Array(N), cont=new Int8Array(N), isLand=new Uint8Array(N);
+  for(let z=0;z<H;z++)for(let x=0;x<W;x++){
+    const i=z*W+x;
+    const wx=x+(fbm(nWarp,x*0.012,z*0.012,3)-0.5)*80+(fbm(nWarp2,x*0.05+3,z*0.05+3,3)-0.5)*16, wz=z+(fbm(nWarp2,x*0.012,z*0.012,3)-0.5)*80+(fbm(nWarp,x*0.05+9,z*0.05+9,3)-0.5)*16;
+    let best=-9,bc=0;
+    for(const q of shapes){const d=Math.hypot((wx-q.cx)/q.rx,(wz-q.cz)/q.rz),sh=1-d;if(sh>best){best=sh;bc=q.id;}}
+    let ridge=0;
+    for(const br of bridges){
+      // a broad, irregular land connection: its width swells and pinches along the way (plains, gulfs, isthmuses)
+      const ax=br.a.cx,az=br.a.cz,bx=br.b.cx-ax,bz=br.b.cz-az;
+      const t=Math.max(0,Math.min(1,((wx-ax)*bx+(wz-az)*bz)/(bx*bx+bz*bz)));
+      const width=br.hw*(0.55+0.9*fbm(nCoast,(ax+bx*t)*0.03+7,(az+bz*t)*0.03+7,2));
+      const dr=Math.hypot(wx-(ax+bx*t),wz-(az+bz*t))/width;
+      const sh=0.9*(1-dr*dr);
+      if(sh>best)best=sh;
+      if(dr<0.6)ridge=Math.max(ridge,1-dr/0.6);   // a mountain range along the join
+    }
+    v[i]=best-0.22+(fbm(nCoast,x*0.04,z*0.04,6)-0.5)*1.0;
+    const md=Math.min(x,W-1-x,z,H-1-z); if(md<30)v[i]-=(1-md/30)*1.6;   // keep an ocean margin so continents are never cut off by the map edge
+    const rn=1-Math.abs(2*fbm(nRidge,x*0.022,z*0.022,3)-1);   // ridge lines -> mountain chains
+    e[i]=Math.min(1,fbm(nElev,x*0.05,z*0.05,4)*0.75+rn*rn*rn*0.5+ridge*0.3);
+    cont[i]=bc;
+    isLand[i]=v[i]>=0?1:0;
+  }
+  const nb=(i,f)=>{const x=i%W,z=(i/W)|0;if(x>0)f(i-1);if(x<W-1)f(i+1);if(z>0)f(i-W);if(z<H-1)f(i+W);};
+  // landmasses; drop islets smaller than 40 tiles
+  const comps=[], seen=new Uint8Array(N);
+  for(let s=0;s<N;s++){
+    if(!isLand[s]||seen[s])continue;
+    const list=[s],stack=[s];seen[s]=1;
+    while(stack.length){const i=stack.pop();nb(i,j=>{if(isLand[j]&&!seen[j]){seen[j]=1;list.push(j);stack.push(j);}});}
+    if(list.length<40){for(const i of list)isLand[i]=0;continue;}
+    comps.push(list);
+  }
+  // normalise elevation so ~8% of land is mountain and ~17% hills, wherever the ridges fell
+  {
+    const ev=[];for(let i=0;i<N;i++)if(isLand[i])ev.push(e[i]);ev.sort((p,q)=>p-q);
+    const q75=ev[Math.floor(ev.length*0.75)],q92=ev[Math.floor(ev.length*0.92)],mx=ev[ev.length-1];
+    for(let i=0;i<N;i++){const x=e[i];e[i]=x<=q75?0.58*x/q75:x<=q92?0.58+0.08*(x-q75)/(q92-q75):0.66+0.34*(x-q92)/Math.max(1e-6,mx-q92);}
+  }
+  let total=0;for(const l of comps)total+=l.length;
+  const targetSize=total/(targetCountries*1.4); // start with extra seeds, then merge neighbours into bigger nations
+  // seeds spread by best-candidate sampling
+  const seeds=[];
+  for(const list of comps){
+    const k=Math.max(1,Math.round(list.length/targetSize)),mine=[];
+    mine.push(list[(rand()*list.length)|0]);
+    while(mine.length<k){
+      let best=-1,bd=-1;
+      for(let c=0;c<40;c++){
+        const cand=list[(rand()*list.length)|0],cx=cand%W,cz=(cand/W)|0;
+        let md=1e9;for(const m of mine){const dx=cx-m%W,dz=cz-((m/W)|0);md=Math.min(md,dx*dx+dz*dz);}
+        if(md>bd){bd=md;best=cand;}
+      }
+      mine.push(best);
+    }
+    seeds.push(...mine);
+  }
+  // randomized multi-source flood fill -> irregular contiguous borders (mountains slow it)
+  const owner=new Int16Array(N).fill(-1), dist=new Float64Array(N).fill(1e9);
+  const hk=[],hv=[];
+  const push=(k,x)=>{let i=hk.length;hk.push(k);hv.push(x);while(i>0){const p=(i-1)>>1;if(hk[p]<=hk[i])break;[hk[p],hk[i]]=[hk[i],hk[p]];[hv[p],hv[i]]=[hv[i],hv[p]];i=p;}};
+  const pop=()=>{const k=hk[0],x=hv[0],lk=hk.pop(),lx=hv.pop();if(hk.length){hk[0]=lk;hv[0]=lx;let i=0;for(;;){let l=2*i+1,r=l+1,m=i;if(l<hk.length&&hk[l]<hk[m])m=l;if(r<hk.length&&hk[r]<hk[m])m=r;if(m===i)break;[hk[m],hk[i]]=[hk[i],hk[m]];[hv[m],hv[i]]=[hv[i],hv[m]];i=m;}}return [k,x];};
+  const rate=seeds.map(()=>0.7+rand()*0.9);
+  seeds.forEach((s,id)=>{owner[s]=id;dist[s]=0;push(0,s);});
+  while(hk.length){
+    const [d,i]=pop();if(d>dist[i])continue;
+    nb(i,j=>{
+      if(!isLand[j])return;
+      const rv=Math.abs(fbm(nRiver,(j%W)*0.035,((j/W)|0)*0.035,3)-0.5);
+      const nd=d+(0.5+1.3*fbm(nCost,(j%W)*0.06,((j/W)|0)*0.06,3)+rand()*0.3+(e[j]>0.66?1.5:0)+(rv<0.02?2.5:0))/rate[owner[i]]; // borders like to follow ridges and 'rivers'
+      if(nd<dist[j]){dist[j]=nd;owner[j]=owner[i];push(nd,j);}
+    });
+  }
+  // smooth ragged borders: a tile flips to the owner most of its 8 neighbours share
+  for(let pass=0;pass<2;pass++){
+    const next=owner.slice();
+    for(let i=0;i<N;i++){
+      if(!isLand[i])continue;
+      const x=i%W,z=(i/W)|0,tally=new Map();
+      for(let dz=-1;dz<=1;dz++)for(let dx=-1;dx<=1;dx++){
+        if(!dx&&!dz)continue;const xx=x+dx,zz=z+dz;if(xx<0||zz<0||xx>=W||zz>=H)continue;
+        const j=zz*W+xx;if(!isLand[j])continue;tally.set(owner[j],(tally.get(owner[j])||0)+1);
+      }
+      for(const [o,n] of tally)if(n>=5&&o!==owner[i])next[i]=o;
+    }
+    owner.set(next);
+  }
+  // merge neighbouring countries so sizes vary (a few big nations, many mid-sized, some small)
+  const parent=Array.from({length:seeds.length},(_,i)=>i);
+  const find=a=>{while(parent[a]!==a){parent[a]=parent[parent[a]];a=parent[a];}return a;};
+  let alive=new Set(owner.filter((o,i)=>isLand[i]&&o>=0)).size;
+  for(let round=0;round<6&&alive>targetCountries;round++){
+    const adj=new Map();
+    for(let i=0;i<N;i++){
+      if(!isLand[i])continue;const x=i%W;
+      for(const j of [x<W-1?i+1:-1,i+W<N?i+W:-1]){
+        if(j<0||!isLand[j]||owner[j]===owner[i])continue;
+        const a=owner[i],b=owner[j];
+        if(!adj.has(a))adj.set(a,new Map());if(!adj.has(b))adj.set(b,new Map());
+        adj.get(a).set(b,(adj.get(a).get(b)||0)+1);adj.get(b).set(a,(adj.get(b).get(a)||0)+1);
+      }
+    }
+    const ids=[...adj.keys()];
+    for(let k=ids.length-1;k>0;k--){const r=(rand()*(k+1))|0;[ids[k],ids[r]]=[ids[r],ids[k]];}
+    for(const a0 of ids){
+      if(alive<=targetCountries)break;
+      const a=find(a0);
+      let tot=0;const cand=[];
+      for(const [b0,w] of adj.get(a0)){const b=find(b0);if(b!==a){cand.push([b,w]);tot+=w;}}
+      if(!cand.length||rand()<0.25)continue;
+      let r=rand()*tot,pick=cand[0][0];for(const [b,w] of cand){r-=w;if(r<=0){pick=b;break;}}
+      parent[pick]=a;alive--;
+    }
+    for(let i=0;i<N;i++)if(isLand[i])owner[i]=find(owner[i]);
+  }
+  // compact ids, record each country's continent
+  const remap=new Map(),countryCont=[];
+  for(let i=0;i<N;i++){
+    if(!isLand[i]||owner[i]<0)continue;
+    if(!remap.has(owner[i])){remap.set(owner[i],remap.size);countryCont.push(cont[i]);}
+    owner[i]=remap.get(owner[i]);
+  }
+  return {v,e,cont,conts,isLand,owner,countryCont,nCountries:remap.size};
+}
+function makeName(rand,used){
+  const A=['ar','bel','cor','dun','el','fal','gor','han','is','jor','kel','lun','mar','nor','os','pel','ron','sal','tor','ul','val','wen','xan','yor','zul','tar','vor','mir','sel','bran'];
+  const B=['ia','land','stan','ora','ium','mark','heim','ea','onia','dor','ara'];
+  for(let t=0;t<50;t++){
+    let n=A[(rand()*A.length)|0]+(rand()<0.4?A[(rand()*A.length)|0]:'')+B[(rand()*B.length)|0];
+    n=n[0].toUpperCase()+n.slice(1);
+    if(!used.has(n)){used.add(n);return n;}
+  }
+  return 'Realm '+used.size;
+}
+// Scene & Camera Setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f172a);
+scene.fog = new THREE.FogExp2(0x0f172a, 0.0007);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3500);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI / 2.2;
+controls.minDistance = 6;
+controls.maxDistance = 750;
+controls.screenSpacePanning = false;
+
+// Lighting & Ocean (shadows follow the camera target so the huge map stays sharp)
+scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+const sun = new THREE.DirectionalLight(0xfffbeb, 1.4);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -75, right: 75, top: 75, bottom: -75, near: 1, far: 400 });
+scene.add(sun, sun.target);
+
+const water = new THREE.Mesh(
+  new THREE.PlaneGeometry(9000, 9000),
+  new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.2 })
+);
+water.rotation.x = -Math.PI / 2;
+water.position.y = -0.2;
+water.receiveShadow = true;
+scene.add(water);
+
+// World generation
+const MAP_W = 480, MAP_H = 280, TILE_SIZE = 1.6;
+const offX = (MAP_W * TILE_SIZE) / 2 - TILE_SIZE / 2;
+const offZ = (MAP_H * TILE_SIZE) / 2 - TILE_SIZE / 2;
+
+// Saved games reload the same world: the seed plus a snapshot of everything that changed since (see SAVE SLOTS)
+const BOOT_KEY = 'island_boot';
+function bootTake() {
+  let raw = null;
+  try { raw = localStorage.getItem(BOOT_KEY); localStorage.removeItem(BOOT_KEY); } catch (e) {}
+  if (!raw) { try { raw = sessionStorage.getItem(BOOT_KEY); sessionStorage.removeItem(BOOT_KEY); } catch (e) {} }
+  if (!raw) { try { if (typeof window.name === 'string' && window.name.indexOf(BOOT_KEY + ':') === 0) { raw = window.name.slice(BOOT_KEY.length + 1); window.name = ''; } } catch (e) {} }
+  if (typeof raw !== 'string' || !raw) return null;
+  try { const s = JSON.parse(raw); return s && s.seed ? s : null; } catch (e) { return null; }
+}
+function bootStash(save) {
+  const raw = JSON.stringify(save); let ok = false;
+  try { localStorage.setItem(BOOT_KEY, raw); ok = true; } catch (e) {}
+  try { sessionStorage.setItem(BOOT_KEY, raw); ok = true; } catch (e) {}
+  try { window.name = BOOT_KEY + ':' + raw; ok = true; } catch (e) {}
+  return ok;
+}
+window.__gameUp = true;
+const BOOT = bootTake();
+const WORLD_SEED = BOOT ? BOOT.seed : (Math.random() * 1e9) | 0;
+const rand = mulberry32(WORLD_SEED);
+const world = generateWorld(MAP_W, MAP_H, rand);
+const { v: values, e: elev, isLand, owner, cont, conts } = world;
+const forestNoise = makeNoise(rand);
+
+// Countries
+const usedNames = new Set();
+const countries = Array.from({ length: world.nCountries }, (_, id) => ({
+  id, name: makeName(rand, usedNames),
+  color: new THREE.Color().setHSL(((id * 137.508) % 360) / 360, 0.5 + ((id * 0.37) % 1) * 0.3, 0.42 + ((id * 0.61) % 1) * 0.18),
+  continent: world.countryCont[id],
+  tiles: [], built: 0, capital: null, sprite: null
+}));
+
+const cellIdx = new Int32Array(MAP_W * MAP_H).fill(-1);
+const land = [];
+for (let z = 0; z < MAP_H; z++) {
+  for (let x = 0; x < MAP_W; x++) {
+    const i = z * MAP_W + x;
+    if (!isLand[i]) continue;
+    const v = values[i];
+    const el = elev[i];
+    const isBeach = v < 0.035;
+    const height = isBeach ? 0.3 : 0.5 + Math.max(0, el - 0.5) * 3.5;
+    const hex = isBeach ? 0xfde047 : el > 0.66 ? 0x78716c : el > 0.58 ? 0x15803d : 0x22c55e;
+    const country = countries[owner[i]];
+    const terrain = new THREE.Color(hex), jit = (rand() - 0.5) * 0.05;
+    const color = terrain.clone().lerp(country.color, 0.28).offsetHSL(0, 0, jit);
+    const t = {
+      x, z, v, e: el, isBeach, height, color, terrain, jit, i: land.length, cell: i, country: country.id,
+      px: x * TILE_SIZE - offX, pz: z * TILE_SIZE - offZ,
+      topY: height - 0.1, building: null, buildingType: null, tree: -1
+    };
+    cellIdx[i] = land.length;
+    land.push(t);
+    country.tiles.push(t);
+  }
+}
+
+// Capitals (tile nearest each country's centre) and the player's country
+for (const c of countries) {
+  let sx = 0, sz = 0;
+  for (const t of c.tiles) { sx += t.px; sz += t.pz; }
+  c.cx = sx / c.tiles.length; c.cz = sz / c.tiles.length;
+  let best = Infinity;
+  for (const t of c.tiles) {
+    const d = (t.px - c.cx) ** 2 + (t.pz - c.cz) ** 2 + (t.isBeach ? 400 : 0); // prefer inland, but never fail
+    if (d < best) { best = d; c.capital = t; }
+  }
+  c.tiles.sort((a, b) => ((a.px - c.capital.px) ** 2 + (a.pz - c.capital.pz) ** 2) - ((b.px - c.capital.px) ** 2 + (b.pz - c.capital.pz) ** 2));
+}
+const candidates = countries.filter(c => c.tiles.length >= 150);
+const pool = candidates.length ? candidates : countries;
+const player = pool.reduce((a, b) => Math.abs(b.tiles.length - 300) < Math.abs(a.tiles.length - 300) ? b : a);
+const PLAYER_GOLD = new THREE.Color(0xfacc15);
+Object.assign(player, state); state = player; // the player's nation shares the same data model as every bot
+const wars = [];
+const pairKey = (a, b) => a < b ? a + '-' + b : b + '-' + a;
+
+// Land tiles (instanced)
+const tileMesh = new THREE.InstancedMesh(
+  new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshStandardMaterial({ roughness: 0.8 }),
+  land.length
+);
+tileMesh.castShadow = false; tileMesh.receiveShadow = true; tileMesh.frustumCulled = false;
+const dummy = new THREE.Object3D();
+land.forEach((t, i) => {
+  dummy.position.set(t.px, t.height / 2 - 0.1, t.pz);
+  dummy.scale.set(TILE_SIZE * 0.96, t.height, TILE_SIZE * 0.96);
+  dummy.rotation.set(0, 0, 0);
+  dummy.updateMatrix();
+  tileMesh.setMatrixAt(i, dummy.matrix);
+  tileMesh.setColorAt(i, t.color);
+});
+tileMesh.instanceMatrix.needsUpdate = true;
+tileMesh.instanceColor.needsUpdate = true;
+scene.add(tileMesh);
+
+// Borders between countries (raised strips along shared tile edges; rebuilt whenever land changes hands)
+const BORDER_CAP = 90000;
+const borderMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.5 }), BORDER_CAP);
+borderMesh.frustumCulled = false;
+const CREAM = new THREE.Color(0xfef9c3), RED = new THREE.Color(0xf87171);
+function rebuildBorders() {
+  const warKeys = new Set(wars.map(w => pairKey(w.a, w.b)));
+  let n = 0;
+  for (const t of land) {
+    for (let k = 0; k < 2; k++) {
+      const j = k === 0 ? (t.x < MAP_W - 1 ? cellIdx[t.cell + 1] : -1) : (t.z < MAP_H - 1 ? cellIdx[t.cell + MAP_W] : -1);
+      if (j < 0) continue;
+      const u = land[j];
+      if (u.country === t.country || n >= BORDER_CAP) continue;
+      dummy.rotation.set(0, 0, 0);
+      dummy.position.set((t.px + u.px) / 2, Math.max(t.topY, u.topY) + 0.04, (t.pz + u.pz) / 2);
+      if (k === 0) dummy.scale.set(0.1, 0.08, TILE_SIZE + 0.1); else dummy.scale.set(TILE_SIZE + 0.1, 0.08, 0.1);
+      dummy.updateMatrix();
+      borderMesh.setMatrixAt(n, dummy.matrix);
+      borderMesh.setColorAt(n, (t.country === player.id || u.country === player.id) ? PLAYER_GOLD : warKeys.has(pairKey(t.country, u.country)) ? RED : CREAM);
+      n++;
+    }
+  }
+  borderMesh.count = n;
+  borderMesh.instanceMatrix.needsUpdate = true;
+  if (borderMesh.instanceColor) borderMesh.instanceColor.needsUpdate = true;
+}
+rebuildBorders();
+scene.add(borderMesh);
+
+// Trees (instanced; clustered into forests)
+const treeSpots = [];
+land.forEach(t => {
+  if (t.isBeach || t.e > 0.66) return;
+  const forest = fbm(forestNoise, t.x * 0.1, t.z * 0.1, 3);
+  if (rand() < (forest > 0.52 ? 0.55 : 0.07)) treeSpots.push(t);
+});
+const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.12, 0.4, 6), new THREE.MeshStandardMaterial({ color: 0x78350f }), treeSpots.length || 1);
+const leaves = new THREE.InstancedMesh(new THREE.ConeGeometry(0.35, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0x14532d }), treeSpots.length || 1);
+leaves.castShadow = true; trunks.frustumCulled = false; leaves.frustumCulled = false;
+treeSpots.forEach((t, i) => {
+  const s = 0.8 + rand() * 0.5;
+  dummy.rotation.set(0, rand() * 6.28, 0);
+  dummy.scale.set(s, s, s);
+  dummy.position.set(t.px, t.topY + 0.2 * s, t.pz); dummy.updateMatrix(); trunks.setMatrixAt(i, dummy.matrix);
+  dummy.position.set(t.px, t.topY + 0.7 * s, t.pz); dummy.updateMatrix(); leaves.setMatrixAt(i, dummy.matrix);
+  t.tree = i;
+});
+scene.add(trunks, leaves);
+
+function removeTree(t) {
+  if (t.tree < 0) return;
+  dummy.position.set(0, -50, 0); dummy.scale.set(0, 0, 0); dummy.updateMatrix();
+  trunks.setMatrixAt(t.tree, dummy.matrix); leaves.setMatrixAt(t.tree, dummy.matrix);
+  trunks.instanceMatrix.needsUpdate = true; leaves.instanceMatrix.needsUpdate = true;
+  t.tree = -1;
+}
+
+// Labels (screen-constant size sprites): countries show when zoomed in, continents when zoomed out
+function drawLabel(c) {
+  const cv = c.sprite.material.map.image, g = cv.getContext('2d'), big = cv.width > 300;
+  g.clearRect(0, 0, cv.width, cv.height);
+  g.font = (big ? '800 76px' : '700 30px') + ' system-ui, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = big ? 12 : 6; g.strokeStyle = 'rgba(15,23,42,.9)'; g.lineJoin = 'round';
+  g.strokeText(c.name, cv.width / 2, cv.height / 2);
+  g.fillStyle = c === player ? '#fde047' : '#f8fafc';
+  g.fillText(c.name, cv.width / 2, cv.height / 2);
+  c.sprite.material.map.needsUpdate = true;
+}
+function makeLabel(c, big, x, z, scaleX, scaleY) {
+  const cv = document.createElement('canvas'); cv.width = big ? 512 : 256; cv.height = big ? 128 : 64;
+  const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false, sizeAttenuation: false, fog: false });
+  c.sprite = new THREE.Sprite(mat);
+  c.sprite.scale.set(scaleX, scaleY, 1);
+  c.sprite.position.set(x, big ? 8 : 3, z);
+  c.sprite.renderOrder = big ? 11 : 10;
+  drawLabel(c);
+  scene.add(c.sprite);
+}
+for (const c of countries) {
+  const k = 0.8 + Math.min(0.6, c.tiles.length / 700);
+  makeLabel(c, false, c.capital.px, c.capital.pz, 0.1 * k, 0.025 * k);
+  c.showUntil = 60 + c.tiles.length * 0.6;
+}
+const continents = conts.map((q, k) => ({ name: CONTINENT_NAMES[k] }));
+continents.forEach((c, k) => makeLabel(c, true, conts[k].cx * TILE_SIZE - offX, conts[k].cz * TILE_SIZE - offZ, 0.32, 0.08));
+
+// Player nation name box
+const nameInput = document.getElementById('nation-name');
+nameInput.value = player.name;
+nameInput.addEventListener('input', () => { player.name = nameInput.value.trim() || 'Nameless Land'; drawLabel(player); });
+
+// Camera starts over the player's capital
+controls.target.set(player.capital.px, 0.5, player.capital.pz);
+camera.position.set(player.capital.px + 16, 18, player.capital.pz + 16);
+
+// 3D Building Models (geometry and materials are shared so hundreds of buildings stay cheap)
+const shared = new Map();
+const S = (key, make) => { if (!shared.has(key)) shared.set(key, make()); return shared.get(key); };
+const mat = (c, extra = {}) => S('m' + c + JSON.stringify(extra), () => new THREE.MeshStandardMaterial({ color: c, ...extra }));
+function part(geo, color, y, extra) {
+  const m = new THREE.Mesh(geo, mat(color, extra));
+  m.position.y = y; m.castShadow = true;
+  return m;
+}
+function createBuildingMesh(type) {
+  const g = new THREE.Group();
+  if (type === 'house') {
+    const roof = part(S('roofH', () => new THREE.ConeGeometry(0.65, 0.45, 4)), 0xdc2626, 0.775); roof.rotation.y = Math.PI / 4;
+    g.add(part(S('baseH', () => new THREE.BoxGeometry(0.8, 0.55, 0.8)), 0xfef3c7, 0.275), roof);
+  } else if (type === 'lumber') {
+    const logs = part(S('logs', () => new THREE.CylinderGeometry(0.15, 0.15, 0.6, 8)), 0xd97706, 0.15);
+    logs.rotation.z = Math.PI / 2; logs.position.z = 0.5; logs.castShadow = false;
+    g.add(part(S('cabin', () => new THREE.BoxGeometry(0.9, 0.5, 0.7)), 0x92400e, 0.25), logs);
+  } else if (type === 'market') {
+    g.add(part(S('hall', () => new THREE.BoxGeometry(1.05, 0.65, 1.05)), 0xe2e8f0, 0.325),
+          part(S('dome', () => new THREE.SphereGeometry(0.45, 12, 12)), 0x2563eb, 0.75));
+  } else if (type === 'tower') {
+    const crystal = part(S('crys', () => new THREE.OctahedronGeometry(0.28)), 0x38bdf8, 1.85, { emissive: 0x0284c7, emissiveIntensity: 0.8 });
+    crystal.castShadow = false;
+    g.userData.crystal = crystal;
+    g.add(part(S('spire', () => new THREE.CylinderGeometry(0.25, 0.4, 1.5, 8)), 0x475569, 0.75), crystal);
+  }
+  return g;
+}
+
+let crystals = [];
+function rebuildCrystals() {
+  crystals = land.filter(t => t.building && t.building.userData.crystal).map(t => t.building.userData.crystal);
+}
+let gameLive = false;   // effects stay off while the world is first being set up
+const effects = [];
+const RING_GEO = new THREE.RingGeometry(0.45, 0.6, 40);
+const BEAM_GEO = new THREE.CylinderGeometry(0.1, 0.1, 10, 8, 1, true);
+const ICONS = { house: '🏠', lumber: '🪵', market: '🏪', tower: '🔮', flag: '🚩' };
+const iconMats = {};
+function iconMaterial(type) {
+  if (!iconMats[type]) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'); g.font = '46px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(ICONS[type] || '🏗️', 32, 36);
+    iconMats[type] = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false, fog: false });
+  }
+  return iconMats[type].clone();
+}
+// Visible "construction" feedback: building pops in, a ring and light beam pulse out, an icon floats up, the minimap pings
+function spawnEffect(tile, type, b) {
+  const owner = countries[tile.country];
+  const col = owner === player ? new THREE.Color(0xfacc15) : owner.color.clone().offsetHSL(0, 0.1, 0.18);
+  const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(tile.px, tile.topY + 0.08, tile.pz);
+  const beam = new THREE.Mesh(BEAM_GEO, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+  beam.position.set(tile.px, tile.topY + 5, tile.pz);
+  const sprite = new THREE.Sprite(iconMaterial(type));
+  sprite.scale.set(1.5, 1.5, 1); sprite.position.set(tile.px, tile.topY + 1.7, tile.pz); sprite.renderOrder = 12;
+  scene.add(ring, beam, sprite);
+  b.scale.set(0.01, 0.01, 0.01);
+  effects.push({ t0: clock.elapsedTime, tile, b, ring, beam, sprite });
+  const p = document.createElement('div');
+  p.className = 'mm-ping'; p.style.left = (tile.x / MAP_W * 100) + '%'; p.style.top = (tile.z / MAP_H * 100) + '%'; p.style.borderColor = '#' + col.getHexString();
+  mm.appendChild(p); setTimeout(() => p.remove(), 1300);
+}
+function updateEffects(t) {
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const e = effects[i], k = (t - e.t0) / 2;
+    const pk = Math.min(1, (t - e.t0) / 0.7), q = pk - 1, s = 1 + 2.70158 * q * q * q + 1.70158 * q * q;   // ease-out-back pop
+    e.b.scale.set(s, s, s);
+    if (k >= 1) {
+      scene.remove(e.ring, e.beam, e.sprite);
+      e.ring.material.dispose(); e.beam.material.dispose(); e.sprite.material.dispose();
+      effects.splice(i, 1); continue;
+    }
+    const r = 1 + k * 4.5;
+    e.ring.scale.set(r, r, r); e.ring.material.opacity = 0.9 * (1 - k);
+    e.beam.scale.set(1 + k, 1, 1 + k); e.beam.material.opacity = 0.55 * (1 - k) * (1 - k);
+    e.sprite.position.y = e.tile.topY + 1.7 + k * 2.2;
+    e.sprite.material.opacity = k < 0.7 ? 1 : (1 - k) / 0.3;
+  }
+}
+// ---------- War visuals: skirmishes on the front line, captured-land flags ----------
+const battles = [], captures = [];
+const UNIT_ICON_MATS = {};
+const DISC_GEO = new THREE.CircleGeometry(0.3, 14);
+const BOOM_GEO = new THREE.SphereGeometry(0.5, 10, 8);
+function unitSpriteMat(k) {
+  if (!UNIT_ICON_MATS[k]) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const g = cv.getContext('2d'); g.font = '46px system-ui, "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(UNITS[k].icon, 32, 36);
+    UNIT_ICON_MATS[k] = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false, fog: false });
+  }
+  return UNIT_ICON_MATS[k].clone();
+}
+function textSprite(text, color) {
+  const cv = document.createElement('canvas'); cv.width = 160; cv.height = 56;
+  const g = cv.getContext('2d'); g.font = '700 38px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 7; g.strokeStyle = 'rgba(15,23,42,.95)'; g.lineJoin = 'round'; g.strokeText(text, 80, 30); g.fillStyle = color; g.fillText(text, 80, 30);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false, fog: false }));
+  sp.scale.set(2.2, 0.77, 1); sp.renderOrder = 14;
+  return sp;
+}
+function pickKind(c, naval) {
+  const opts = []; let total = 0;
+  for (const k in UNITS) {
+    if (k === 'ship' && !naval) continue;
+    const n = c.units[k] || 0;
+    if (n > 0) { const wgt = Math.sqrt(n) * (k === 'soldier' ? 1.3 : 1); opts.push([k, wgt]); total += wgt; }
+  }
+  if (!opts.length) return 'soldier';
+  let r = Math.random() * total;
+  for (const [k, wgt] of opts) { r -= wgt; if (r <= 0) return k; }
+  return opts[0][0];
+}
+// a pair of touching tiles (one from each side) where the fighting happens
+function frontPair(w, A, B) {
+  if (!w.front || gt - (w.frontT || 0) > 10) {
+    const f = [];
+    for (const t of A.tiles) {
+      for (const j of neighbours(t)) if (land[j].country === B.id) f.push([t, land[j]]);
+      if (f.length > 300) break;
+    }
+    if (!f.length && A.tiles.length && B.tiles.length) {      // overseas war: the two nearest coasts
+      let ta = null, tb = null, d1 = Infinity, d2 = Infinity;
+      for (const t of A.tiles) { const d = (t.px - B.capital.px) ** 2 + (t.pz - B.capital.pz) ** 2; if (d < d1) { d1 = d; ta = t; } }
+      for (const t of B.tiles) { const d = (t.px - A.capital.px) ** 2 + (t.pz - A.capital.pz) ** 2; if (d < d2) { d2 = d; tb = t; } }
+      if (ta && tb) f.push([ta, tb]);
+    }
+    w.front = f; w.frontT = gt;
+  }
+  return w.front.length ? w.front[(Math.random() * w.front.length) | 0] : null;
+}
+function spawnBattle(w, A, B, lossA, lossB, winnerSide) {
+  if (battles.length >= 16) return;
+  const involvesPlayer = A === player || B === player;
+  const pair = frontPair(w, A, B); if (!pair) return;
+  const [ta, tb] = pair;
+  const mx = (ta.px + tb.px) / 2, mz = (ta.pz + tb.pz) / 2, my = Math.max(ta.topY, tb.topY);
+  const dx = mx - controls.target.x, dz = mz - controls.target.z, lim = involvesPlayer ? 420 : 170;
+  if (involvesPlayer) {
+    const p = document.createElement('div');
+    p.className = 'mm-ping'; p.style.left = (ta.x / MAP_W * 100) + '%'; p.style.top = (ta.z / MAP_H * 100) + '%'; p.style.borderColor = '#ef4444';
+    mm.appendChild(p); setTimeout(() => p.remove(), 1300);
+  }
+  if (dx * dx + dz * dz > lim * lim) return;      // too far from the camera to bother drawing
+  let ux = tb.px - ta.px, uz = tb.pz - ta.pz; const L = Math.hypot(ux, uz) || 1; ux /= L; uz /= L;
+  const naval = ta.isBeach || tb.isBeach || L > TILE_SIZE * 2;
+  const n = Math.min(3, 1 + Math.floor(Math.log2(1 + Math.min(power(A), power(B)) / 12)));
+  for (let s = 0; s < n; s++) {
+    const off = (Math.random() - 0.5) * 3.4;
+    spawnSkirmish(A, B, mx - uz * off, mz + ux * off, my, ux, uz, naval, s === 0 ? lossA : 0, s === 0 ? lossB : 0, winnerSide);
+  }
+}
+function spawnSkirmish(A, B, cx, cz, y, ux, uz, naval, lossA, lossB, winnerSide) {
+  const units = [], labels = [];
+  for (const [C, dir] of [[A, -1], [B, 1]]) {
+    const k = pickKind(C, naval), count = k === 'soldier' ? 3 : 1;
+    const col = C === player ? new THREE.Color(0xfacc15) : C.color.clone().offsetHSL(0, 0.1, 0.12);
+    const loser = winnerSide ? (dir < 0 ? winnerSide === 'B' : winnerSide === 'A') : Math.random() < 0.5;
+    for (let i = 0; i < count; i++) {
+      const side = (i - (count - 1) / 2) * 0.6;
+      const disc = new THREE.Mesh(DISC_GEO, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide }));
+      disc.rotation.x = -Math.PI / 2;
+      const sp = new THREE.Sprite(unitSpriteMat(k)); const sc = k === 'soldier' ? 0.95 : 1.4; sp.scale.set(sc, sc, 1); sp.renderOrder = 13;
+      scene.add(disc, sp);
+      units.push({
+        disc, sp, k, loser,
+        sx: cx + ux * dir * 2.8 - uz * side, sz: cz + uz * dir * 2.8 + ux * side,
+        ex: cx + ux * dir * 0.5 - uz * side, ez: cz + uz * dir * 0.5 + ux * side
+      });
+    }
+    const loss = dir < 0 ? lossA : lossB;
+    if (loss > 0.5) { const lb = textSprite('−' + Math.round(loss), '#fca5a5'); lb.position.set(cx + ux * dir * 1.4, y + 1.2, cz + uz * dir * 1.4); scene.add(lb); labels.push(lb); }
+  }
+  const boom = new THREE.Mesh(BOOM_GEO, new THREE.MeshBasicMaterial({ color: 0xffb020, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+  boom.position.set(cx, y + 0.6, cz); scene.add(boom);
+  battles.push({ t0: clock.elapsedTime, y, cx, cz, units, labels, boom });
+}
+function spawnCapture(tile, owner) {
+  if (captures.length > 30) return;
+  const col = owner === player ? new THREE.Color(0xfacc15) : owner.color.clone().offsetHSL(0, 0.1, 0.18);
+  const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(tile.px, tile.topY + 0.08, tile.pz);
+  const sp = new THREE.Sprite(iconMaterial('flag')); sp.scale.set(1.3, 1.3, 1); sp.position.set(tile.px, tile.topY + 1.2, tile.pz); sp.renderOrder = 12;
+  scene.add(ring, sp);
+  captures.push({ t0: clock.elapsedTime, tile, ring, sp });
+}
+function updateBattles(t) {
+  for (let i = battles.length - 1; i >= 0; i--) {
+    const b = battles[i], k = (t - b.t0) / 2.8;
+    if (k >= 1) {
+      for (const u of b.units) { scene.remove(u.disc, u.sp); u.disc.material.dispose(); u.sp.material.dispose(); }
+      for (const l of b.labels) { scene.remove(l); l.material.map.dispose(); l.material.dispose(); }
+      scene.remove(b.boom); b.boom.material.dispose();
+      battles.splice(i, 1); continue;
+    }
+    const adv = Math.min(1, k / 0.42), e = 1 - (1 - adv) * (1 - adv), clash = k > 0.42 && k < 0.8;
+    for (const u of b.units) {
+      let x = u.sx + (u.ex - u.sx) * e, z = u.sz + (u.ez - u.sz) * e;
+      if (clash) { x += Math.sin(t * 38 + u.sx * 7) * 0.07; z += Math.cos(t * 41 + u.sz * 7) * 0.07; }
+      const hop = adv < 1 ? Math.abs(Math.sin(k * 26)) * (u.k === 'soldier' ? 0.16 : 0.05) : 0;
+      const alt = u.k === 'jet' ? 1.5 + (1 - e) * 1.2 : u.k === 'ship' ? Math.sin(t * 3 + u.sx) * 0.05 : 0;
+      let op = 1, sink = 0;
+      if (k > 0.72) { const f = (k - 0.72) / 0.28; if (u.loser) { op = 1 - f; sink = f * 0.6; } else op = 1 - Math.max(0, (f - 0.5) * 2); }
+      u.disc.position.set(x, b.y + 0.07, z); u.disc.material.opacity = 0.85 * op;
+      u.sp.position.set(x, b.y + 0.55 + alt + hop - sink, z); u.sp.material.opacity = op;
+    }
+    const peak = Math.max(0, 1 - Math.abs(k - 0.55) / 0.22);
+    b.boom.material.opacity = 0.85 * peak; const bs = 0.6 + Math.max(0, k - 0.4) * 5; b.boom.scale.set(bs, bs, bs);
+    for (const l of b.labels) { const f = Math.max(0, (k - 0.5) / 0.5); l.position.y = b.y + 1.2 + f * 2.4; l.material.opacity = k < 0.5 ? 0 : 1 - f * f; }
+  }
+  for (let i = captures.length - 1; i >= 0; i--) {
+    const c = captures[i], k = (t - c.t0) / 1.8;
+    if (k >= 1) { scene.remove(c.ring, c.sp); c.ring.material.dispose(); c.sp.material.dispose(); captures.splice(i, 1); continue; }
+    const r = 1 + k * 3.5; c.ring.scale.set(r, r, r); c.ring.material.opacity = 0.9 * (1 - k);
+    c.sp.position.y = c.tile.topY + 1.2 + k * 1.2; c.sp.material.opacity = k < 0.6 ? 1 : (1 - k) / 0.4;
+  }
+}
+
+function placeBuilding(tile, type) {
+  removeTree(tile);
+  const b = createBuildingMesh(type);
+  b.position.set(tile.px, tile.topY, tile.pz);
+  scene.add(b);
+  tile.building = b; tile.buildingType = type;
+  if (type === 'tower') rebuildCrystals();
+  if (gameLive) spawnEffect(tile, type, b);
+}
+
+// ================= GAME SYSTEMS =================
+const UNITS = {
+  soldier: { name: 'Soldiers',    icon: '🪖', cost: 20,  power: 1,  upkeep: 0.05 },
+  tank:    { name: 'Tanks',       icon: '🛡️', cost: 90,  power: 5,  upkeep: 0.3 },
+  ship:    { name: 'Warships',    icon: '🚢', cost: 160, power: 9,  upkeep: 0.55 },
+  jet:     { name: 'Fighter jets', icon: '✈️', cost: 220, power: 14, upkeep: 0.9 }
+};
+const COMPANIES = {
+  game:   { name: 'Game studio',        icon: '🎮', cost: 200,  income: 7,  inf: 6 },
+  phone:  { name: 'Phone company',      icon: '📱', cost: 150,  income: 5,  inf: 8 },
+  btc:    { name: 'Bitcoin mining',     icon: '₿',  cost: 250,  income: 10, inf: 5, note: 'income follows the Bitcoin price' },
+  ship:   { name: 'Shipping & logistics', icon: '📦', cost: 280, income: 9,  inf: 8 },
+  car:    { name: 'Car maker',          icon: '🚗', cost: 300,  income: 11, inf: 12 },
+  air:    { name: 'Airline',            icon: '🛫', cost: 350,  income: 12, inf: 12 },
+  bank:   { name: 'Bank',               icon: '🏦', cost: 400,  income: 15, inf: 15 },
+  pharma: { name: 'Pharma lab',         icon: '💊', cost: 450,  income: 16, inf: 14 },
+  oil:    { name: 'Oil & gas',          icon: '🛢️', cost: 500,  income: 20, inf: 10 },
+  energy: { name: 'Renewable energy',   icon: '⚡', cost: 550,  income: 17, inf: 18, popCap: 10, note: '+10 population cap' },
+  chip:   { name: 'Microchip fab',      icon: '💾', cost: 600,  income: 26, inf: 25 },
+  arms:   { name: 'Arms manufacturer',  icon: '🔫', cost: 700,  income: 18, inf: 10, note: '-8% unit prices (max -40%)' },
+  ai:     { name: 'AI lab',             icon: '🤖', cost: 1000, income: 38, inf: 35 },
+  space:  { name: 'Space agency',       icon: '🚀', cost: 1500, income: 40, inf: 60 }
+};
+let gt = 0, btc = 1, btcPrev = 1, dirtyMap = false, dirtyPanel = true;
+const truce = new Map(), logs = [];
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e4 ? (n / 1e3).toFixed(1) + 'k' : Math.floor(n).toString();
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+function log(msg, cls = '') { logs.unshift({ t: gt, msg, cls }); if (logs.length > 80) logs.pop(); dirtyPanel = true; }
+
+// every country (player included) shares one data model
+for (const c of countries) {
+  if (c === player) continue;
+  c.gold = 120 + rand() * 180; c.wood = 100; c.pop = 10 + Math.floor(rand() * 10); c.popCap = 10;
+  c.influence = 0; c.goldRate = 0; c.woodRate = 0;
+  c.units = { soldier: Math.round(c.tiles.length * 0.05) + 3, tank: 0, ship: 0, jet: 0 };
+}
+for (const c of countries) { c.companies = {}; c.allies = new Set(); c.cool = {}; c.dev = 0; c.favor = 0; c.dead = false; c.built = 0; c.bonusIncome = 0; c.brands = []; }
+player.units = { soldier: 10, tank: 0, ship: 0, jet: 0 };
+
+const power = c => { let p = 0; for (const k in UNITS) p += (c.units[k] || 0) * UNITS[k].power; return p; };
+const effPower = c => { let p = power(c); for (const id of c.allies) p += 0.35 * power(countries[id]); return p; };
+const unitCost = (c, k) => Math.round(UNITS[k].cost * (1 - Math.min(0.4, (c.companies.arms || 0) * 0.08)));
+const companyCost = (c, k) => Math.round(COMPANIES[k].cost * Math.pow(1.4, c.companies[k] || 0));
+const companyIncome = c => { let s = c.bonusIncome || 0; for (const k in c.companies) s += COMPANIES[k].income * c.companies[k] * (k === 'btc' ? btc : 1); return s; };
+const upkeep = c => { let s = 0; for (const k in UNITS) s += (c.units[k] || 0) * UNITS[k].upkeep; return s; };
+const netIncome = c => c.pop * 0.2 + c.dev * 0.5 + c.goldRate + companyIncome(c) - upkeep(c);
+
+function applyBuilding(c, type, sign) {
+  const s = BUILDINGS[type];
+  c.popCap += s.popCap * sign; c.goldRate += s.goldRate * sign; c.woodRate += s.woodRate * sign; c.influence += s.inf * sign; c.built += sign;
+}
+function applyCompany(c, k, sign) {
+  const C = COMPANIES[k];
+  c.influence += C.inf * sign; if (C.popCap) c.popCap += C.popCap * sign;
+}
+
+// ---- map changes: conquest ----
+function reassignCapital(c) {
+  let sx = 0, sz = 0;
+  for (const t of c.tiles) { sx += t.px; sz += t.pz; }
+  c.cx = sx / c.tiles.length; c.cz = sz / c.tiles.length;
+  let best = Infinity;
+  for (const t of c.tiles) {
+    const d = (t.px - c.cx) ** 2 + (t.pz - c.cz) ** 2 + (t.isBeach ? 400 : 0);
+    if (d < best) { best = d; c.capital = t; }
+  }
+  c.sprite.position.set(c.capital.px, 3, c.capital.pz);
+}
+function transferTiles(list, to) {
+  if (!list.length) return;
+  const from = countries[list[0].country], set = new Set(list);
+  for (const t of list) {
+    if (t.building) { applyBuilding(from, t.buildingType, -1); applyBuilding(to, t.buildingType, 1); }
+    t.country = to.id;
+    t.color = t.terrain.clone().lerp(to.color, 0.28).offsetHSL(0, 0, t.jit);
+    tileMesh.setColorAt(t.i, t.color);
+    to.tiles.push(t);
+  }
+  from.tiles = from.tiles.filter(t => !set.has(t));
+  tileMesh.instanceColor.needsUpdate = true;
+  if (gameLive) for (const t of list.slice(0, 3)) spawnCapture(t, to);
+  if (from.tiles.length && set.has(from.capital)) reassignCapital(from);
+  dirtyMap = true;
+}
+function neighbours(t) {
+  const out = [];
+  if (t.x > 0) out.push(cellIdx[t.cell - 1]);
+  if (t.x < MAP_W - 1) out.push(cellIdx[t.cell + 1]);
+  if (t.z > 0) out.push(cellIdx[t.cell - MAP_W]);
+  if (t.z < MAP_H - 1) out.push(cellIdx[t.cell + MAP_W]);
+  return out.filter(j => j >= 0);
+}
+function borderTiles(loser, winner, allowCapital) {
+  const out = [];
+  for (const t of loser.tiles) {
+    if (!allowCapital && t === loser.capital) continue;
+    if (neighbours(t).some(j => land[j].country === winner.id)) out.push(t);
+  }
+  return out;
+}
+function conquer(winner, loser, n) {
+  const allowCap = loser.tiles.length <= 3;
+  let cand = borderTiles(loser, winner, allowCap);
+  if (!cand.length && Math.random() < 0.35) { // naval landing on the nearest coast
+    let best = Infinity, pick = null;
+    for (const t of loser.tiles) {
+      if (t === loser.capital && !allowCap) continue;
+      const d = (t.px - winner.capital.px) ** 2 + (t.pz - winner.capital.pz) ** 2;
+      if (d < best) { best = d; pick = t; }
+    }
+    if (pick) cand = [pick];
+  }
+  if (!cand.length) return 0;
+  for (let i = cand.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [cand[i], cand[j]] = [cand[j], cand[i]]; }
+  const take = cand.slice(0, n);
+  transferTiles(take, winner);
+  if (!loser.tiles.length) killCountry(loser, winner);
+  return take.length;
+}
+function killCountry(c, killer) {
+  c.dead = true; c.sprite.visible = false;
+  for (const w of wars.filter(w => w.a === c.id || w.b === c.id)) wars.splice(wars.indexOf(w), 1);
+  for (const id of c.allies) countries[id].allies.delete(c.id);
+  c.allies.clear();
+  killer.gold += c.gold; killer.units.soldier += Math.floor(power(c) / 4);
+  log(`💀 ${c.name} was annexed by ${killer.name}`, 'war');
+  dirtyMap = true;
+  if (c === player) gameOver();
+}
+function gameOver() {
+  gameEnded = true;
+  popup(`<b>💀 ${player.name} has fallen.</b><br>Your last land was conquered.`, [{ label: 'New world', fn: () => location.reload() }], 1e9);
+}
+
+// ---- wars ----
+const warBetween = (a, b) => wars.find(w => (w.a === a && w.b === b) || (w.a === b && w.b === a));
+const atWar = c => wars.some(w => w.a === c.id || w.b === c.id);
+const truceLeft = (a, b) => Math.max(0, (truce.get(pairKey(a, b)) || 0) - gt);
+function declareWar(a, b) {
+  const A = countries[a], B = countries[b];
+  for (const X of [A, B]) if (!atWar(X)) X.warBase = power(X);   // army size when the fighting began: wartime reinforcements are capped relative to this
+  wars.push({ a, b, start: gt, initA: A.tiles.length, initB: B.tiles.length, lostA: 0, lostB: 0, stale: 0, ticks: 0, peaceCool: 0 });
+  log(`⚔️ ${A.name} declared war on ${B.name}`, 'war');
+  dirtyMap = true;
+}
+function endWar(w, why, truceTime = 90) {
+  const i = wars.indexOf(w); if (i >= 0) wars.splice(i, 1);
+  truce.set(pairKey(w.a, w.b), gt + truceTime);
+  const A = countries[w.a], B = countries[w.b];
+  log(`🕊️ ${A.name} and ${B.name}: ${why}`, 'peace');
+  if (A === player || B === player) toast(`🕊️ War with ${(A === player ? B : A).name} ended (${why})`);
+  dirtyMap = true;
+}
+function finishWar(w, winner, loser) {
+  const tribute = Math.floor(loser.gold * 0.2);
+  loser.gold -= tribute; winner.gold += tribute;
+  conquer(winner, loser, Math.max(2, Math.floor(loser.tiles.length * 0.06)));
+  const why = `${winner.name} won`;
+  if (winner === player) toast(`🏆 Victory over ${loser.name}! +${fmt(tribute)} gold`);
+  if (loser === player) toast(`💀 You lost the war to ${winner.name} (-${fmt(tribute)} gold)`);
+  endWar(w, why, 120);
+}
+function casualties(c, dmg) {
+  const p = power(c); if (p <= 0) return;
+  const f = Math.min(0.6, dmg / p);
+  for (const k in UNITS) { const n = c.units[k] || 0; c.units[k] = Math.max(0, n - Math.floor(n * f + Math.random())); }
+}
+function fight(w) {
+  const A = countries[w.a], B = countries[w.b];
+  if (A.dead || B.dead) { wars.splice(wars.indexOf(w), 1); return; }
+  const ea = effPower(A), eb = effPower(B), involvesPlayer = A === player || B === player;
+  const pa0 = power(A), pb0 = power(B);
+  casualties(A, eb * 0.025 * (0.6 + Math.random() * 0.8));
+  casualties(B, ea * 0.025 * (0.6 + Math.random() * 0.8));
+  const lossA = pa0 - power(A), lossB = pb0 - power(B);
+  w.ticks++;
+  const ratio = (ea + 1) / (eb + 1);
+  let winner = ratio > 1.15 ? A : ratio < 1 / 1.15 ? B : null;
+  if (gameLive) spawnBattle(w, A, B, lossA, lossB, winner === A ? 'A' : winner === B ? 'B' : null);
+  if (winner) {
+    const loser = winner === A ? B : A, big = Math.max(ratio, 1 / ratio) > 2.5;
+    const got = conquer(winner, loser, 1 + Math.floor(Math.random() * 2) + (big ? 2 : 0));
+    if (winner === A) w.lostB += got; else w.lostA += got;
+    w.stale = got ? 0 : w.stale + 1;
+  } else w.stale++;
+  if (wars.indexOf(w) < 0) return; // a country was annexed
+  if (w.lostB / w.initB >= 0.3 || (power(B) < 1 && power(A) >= 3)) finishWar(w, A, B);
+  else if (w.lostA / w.initA >= 0.3 || (power(A) < 1 && power(B) >= 3)) finishWar(w, B, A);
+  else if (involvesPlayer ? w.stale >= 40 : (w.stale >= 8 && Math.random() < 0.3) || (w.ticks > 40 && Math.random() < 0.05)) endWar(w, 'ceasefire');
+}
+
+// ---- player diplomacy (acceptance is a roll: alliances ~45%, money ~20%, land ~14%, peace 20-75%) ----
+const cdLeft = (c, k) => Math.ceil(Math.max(0, (c.cool[k] || 0) - gt));
+function proposeAlliance(c) {
+  if (cdLeft(c, 'ally') || atWar(c) || player.allies.has(c.id)) return;
+  if (player.allies.size >= 5 || c.allies.size >= 5) { toast('Alliance limit reached (5)'); return; }
+  const p = 0.45 + Math.max(-0.1, Math.min(0.1, (player.influence - c.influence) / 300)) + c.favor * 0.01;
+  if (Math.random() < p) {
+    player.allies.add(c.id); c.allies.add(player.id); c.favor += 3;
+    log(`🤝 ${c.name} accepted an alliance with you`, 'peace'); toast(`🤝 ${c.name} is now your ally!`);
+  } else { c.cool.ally = gt + 25; c.favor -= 0.5; toast(`${c.name} refused the alliance`); }
+}
+function breakAlliance(c) {
+  player.allies.delete(c.id); c.allies.delete(player.id); c.favor -= 4;
+  log(`💔 You ended the alliance with ${c.name}`, ''); toast('Alliance ended');
+}
+function askMoney(c) {
+  if (cdLeft(c, 'money') || atWar(c)) return;
+  const p = (player.allies.has(c.id) ? 0.35 : 0.2) + c.favor * 0.005, amount = Math.round(Math.max(20, c.gold * 0.12));
+  if (c.gold >= 30 && Math.random() < p) {
+    c.gold -= amount; player.gold += amount; c.cool.money = gt + 60; c.favor -= 1;
+    log(`💰 ${c.name} gave you ${fmt(amount)} gold`, 'peace'); toast(`💰 ${c.name} sent you ${fmt(amount)} gold`);
+  } else { c.cool.money = gt + 25; toast(`${c.name} said no`); }
+}
+function askLand(c) {
+  if (cdLeft(c, 'land') || atWar(c)) return;
+  if (c.tiles.length < 15) { toast(`${c.name} is too small to give land`); return; }
+  const cand = borderTiles(c, player, false);
+  if (!cand.length) { toast(`You share no border with ${c.name}`); return; }
+  const p = (player.allies.has(c.id) ? 0.22 : 0.14) + c.favor * 0.004;
+  if (Math.random() < p) {
+    for (let i = cand.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [cand[i], cand[j]] = [cand[j], cand[i]]; }
+    const n = Math.min(cand.length, 4 + Math.floor(Math.random() * 7));
+    transferTiles(cand.slice(0, n), player); c.cool.land = gt + 90; c.favor -= 2;
+    log(`🗺️ ${c.name} ceded ${n} tiles to you`, 'peace'); toast(`🗺️ ${c.name} ceded ${n} tiles to you!`);
+  } else { c.cool.land = gt + 40; toast(`${c.name} refused to give land`); }
+}
+// Real strength = own army + 35% of each ally's army. Shown everywhere so the numbers match how wars are decided.
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+function oddsHTML(c) {
+  const mp = power(player), tp = power(c), mine = effPower(player), theirs = effPower(c);
+  const verdict = mine >= theirs * 1.15 ? '<span class="g">you would win</span>' : mine * 1.15 <= theirs ? '<span class="r">you would lose</span>' : 'too close to call';
+  const allies = x => [...x.allies].filter(id => !countries[id].dead).map(id => countries[id].name).join(', ');
+  return `<span class="pwr">You: <b>${fmt(mine)}</b> <small>(own ${fmt(mp)} + allies ${fmt(mine - mp)})</small><br>${esc(c.name)}: <b>${fmt(theirs)}</b> <small>(own ${fmt(tp)} + allies ${fmt(theirs - tp)}${c.allies.size ? ': ' + esc(allies(c)) : ''})</small><br>They hold 💰${fmt(c.gold)} for reinforcements — <b>${verdict}</b></span>`;
+}
+function playerDeclareWar(c) {
+  if (player.allies.has(c.id)) { toast('Break the alliance first'); return; }
+  if (warBetween(player.id, c.id)) return;
+  if (truceLeft(player.id, c.id)) { toast(`Truce with ${c.name}: ${truceLeft(player.id, c.id)}s left`); return; }
+  popup(`<b>⚔️ Declare war on ${esc(c.name)}?</b>${oddsHTML(c)}<small>Both sides can buy units during a war and allies lend 35% of their army, so check the numbers.</small>`,
+    [{ label: '⚔️ Declare war', fn: () => { if (!warBetween(player.id, c.id)) { declareWar(player.id, c.id); toast(`⚔️ War on ${c.name}!`); } } }, { label: 'Cancel' }], 1e9);
+}
+function askPeace(w) {
+  if (w.peaceCool > gt) { toast(`They won't talk yet (${Math.ceil(w.peaceCool - gt)}s)`); return; }
+  const enemy = countries[w.a === player.id ? w.b : w.a], r = (effPower(enemy) + 1) / (effPower(player) + 1);
+  const p = r > 1.2 ? 0.2 : r < 0.83 ? 0.75 : 0.5;
+  if (Math.random() < p) endWar(w, 'peace treaty'); else { w.peaceCool = gt + 15; toast(`${enemy.name} rejected peace`); }
+}
+
+// ---- player purchases ----
+function buyUnit(k, n) {
+  const cost = unitCost(player, k) * n;
+  if (player.gold < cost) { toast('Not enough gold'); return; }
+  player.gold -= cost; player.units[k] += n; updateUI(); dirtyPanel = true;
+}
+function buyCompany(k) {
+  const cost = companyCost(player, k);
+  if (player.gold < cost) { toast('Not enough gold'); return; }
+  player.gold -= cost; player.companies[k] = (player.companies[k] || 0) + 1; applyCompany(player, k, 1);
+  log(`🏢 You founded a ${COMPANIES[k].name}`, ''); updateUI(); dirtyPanel = true;
+}
+
+// ---- AI brain ----
+const aiCountries = countries.filter(c => c !== player);
+function aiPlaceBuilding(c, type) {
+  for (let tries = 0; tries < 12; tries++) {
+    const t = c.tiles[Math.floor(Math.pow(Math.random(), 2) * c.tiles.length)];
+    if (!t || t.building || t.isBeach) continue;
+    placeBuilding(t, type); applyBuilding(c, type, 1);
+    return true;
+  }
+  return false;
+}
+function aiDev(c) { const cost = 80 + c.dev * 40; if (c.gold >= cost) { c.gold -= cost; c.dev++; c.popCap += 3; c.influence += 2; } }
+function aiThink(c) {
+  const war = atWar(c), want = 3 + c.tiles.length * 0.06 + c.influence * 0.1 + c.gold * 0.004;
+  const warRoom = !war || (power(c) < (c.warBase || 0) * 1.2 + 10 && gt >= (c.buyCool || 0));   // at war: at most +20% over the starting army, one purchase per 8s
+  if ((war || power(c) < want) && warRoom && c.gold >= unitCost(c, 'soldier') * 3) {
+    if (war) c.buyCool = gt + 8;
+    const budget = c.gold * (war ? 0.25 : 0.4);
+    const maxAdd = 8 + power(c) * (war ? 0.05 : 0.25);       // armies grow gradually, never in one huge shopping spree
+    const keys = Object.keys(UNITS).filter(k => unitCost(c, k) <= budget && UNITS[k].power <= maxAdd);
+    if (keys.length) {
+      const k = keys[Math.floor(Math.pow(Math.random(), 0.6) * keys.length)];
+      const n = Math.max(1, Math.min(25, Math.floor(budget / unitCost(c, k)), Math.floor(maxAdd / UNITS[k].power)));
+      c.gold -= unitCost(c, k) * n; c.units[k] += n;
+      return;
+    }
+  }
+  const r = Math.random(), cap = Math.max(3, Math.round(c.tiles.length * 0.03));
+  if (r < 0.45 && c.built < cap) {
+    const need = c.popCap - c.pop < 4, q = Math.random();
+    const type = need && q < 0.5 ? 'house' : q < 0.4 ? 'house' : q < 0.6 ? 'lumber' : q < 0.88 ? 'market' : 'tower';
+    const cost = BUILDINGS[type];
+    if (c.gold >= cost.gold && c.wood >= cost.wood && aiPlaceBuilding(c, type)) { c.gold -= cost.gold; c.wood -= cost.wood; }
+  } else if (r < 0.75) {
+    const keys = Object.keys(COMPANIES).filter(k => companyCost(c, k) <= c.gold * 0.9);
+    if (keys.length) {
+      const k = keys[Math.floor(Math.pow(Math.random(), 0.5) * keys.length)];
+      c.gold -= companyCost(c, k); c.companies[k] = (c.companies[k] || 0) + 1; applyCompany(c, k, 1);
+      if ((k === 'space' || k === 'ai') && Math.random() < 0.15) log(`🏢 ${c.name} launched a ${COMPANIES[k].name}`, '');
+    }
+  } else aiDev(c);
+}
+let brainIdx = 0;
+function aiBrain() {
+  for (let n = 0; n < 20; n++) {
+    const c = aiCountries[brainIdx++ % aiCountries.length]; if (c.dead) continue;
+    for (let k = 1 + Math.min(5, Math.floor(c.gold / 400)); k > 0; k--) aiThink(c); // rich nations spend more per turn
+  }
+}
+const alive = () => aiCountries.filter(c => !c.dead);
+function neighbourOf(c) {
+  const ids = new Set();
+  for (let i = 0; i < 14; i++) {
+    const t = c.tiles[(Math.random() * c.tiles.length) | 0];
+    for (const j of neighbours(t)) if (land[j].country !== c.id) ids.add(land[j].country);
+  }
+  const arr = [...ids]; return arr.length ? countries[arr[(Math.random() * arr.length) | 0]] : null;
+}
+function aiDiplomacy() {
+  const list = alive();
+  for (let n = 0; n < 6; n++) {
+    const a = list[(Math.random() * list.length) | 0];
+    if (a.dead || atWar(a)) continue;
+    const b = neighbourOf(a);
+    if (!b || b.dead || a.allies.has(b.id) || truceLeft(a.id, b.id) || warBetween(a.id, b.id)) continue;
+    if (b === player && (gt < 180 || wars.filter(w => w.a === player.id || w.b === player.id).length >= 2)) continue;
+    if (wars.length < 12 && power(a) > 6 && power(a) > effPower(b) * (b === player ? 2.5 : 2) + 3 && Math.random() < 0.25) {
+      declareWar(a.id, b.id);
+      if (b === player) popup(`<b>⚔️ ${a.name} declared war on you!</b><br>Their power: ${fmt(power(a))} · yours: ${fmt(power(player))}.<br>Buy units in the Military tab or ask for peace.`, [{ label: 'OK' }], 20000);
+    }
+  }
+  // alliances between neighbours
+  for (let n = 0; n < 3; n++) {
+    const a = list[(Math.random() * list.length) | 0], b = a && neighbourOf(a);
+    if (!b || b === player || b.dead || atWar(a) || atWar(b) || a.allies.has(b.id) || a.allies.size >= 4 || b.allies.size >= 4) continue;
+    if (Math.random() < 0.15) { a.allies.add(b.id); b.allies.add(a.id); if (Math.random() < 0.3) log(`🤝 ${a.name} and ${b.name} formed an alliance`, 'peace'); }
+  }
+}
+// an ally at war asks you for units
+let popupOpen = false;
+function allyRequestCheck() {
+  if (popupOpen || gt < 60) return;
+  const reqs = wars.filter(w => w.a !== player.id && w.b !== player.id && (player.allies.has(w.a) || player.allies.has(w.b)));
+  if (!reqs.length || Math.random() > 0.2) return;
+  const w = reqs[(Math.random() * reqs.length) | 0], ally = countries[player.allies.has(w.a) ? w.a : w.b], foe = countries[w.a === ally.id ? w.b : w.a];
+  const opts = [['soldier', 10, 6], ['tank', 2, 2], ['ship', 1, 1], ['jet', 1, 1]].filter(([k, n, min]) => player.units[k] >= min * 2);
+  if (!opts.length) return;
+  const [k, nWanted] = opts[(Math.random() * opts.length) | 0], n = Math.min(nWanted, Math.floor(player.units[k] / 2));
+  popup(`<b>🤝 ${ally.name} needs help!</b><br>They are at war with ${foe.name} and ask for <b>${n} ${UNITS[k].name.toLowerCase()}</b>.`, [
+    { label: `Send ${n} ${UNITS[k].icon}`, fn: () => {
+      if (player.units[k] < n) return; player.units[k] -= n; ally.units[k] += n; ally.favor += 3;
+      log(`🤝 You sent ${n} ${UNITS[k].name.toLowerCase()} to ${ally.name}`, 'peace'); updateUI(); dirtyPanel = true; } },
+    { label: 'Decline', fn: () => {
+      ally.favor -= 2;
+      if (Math.random() < 0.15) { breakAlliance(ally); log(`😠 ${ally.name} ended the alliance after you refused to help`, 'war'); } } }
+  ], 25000);
+}
+
+// ---- tick ----
+function gameTick() {
+  gt++;
+  btcPrev = btc; btc = Math.max(0.25, Math.min(3.5, btc * Math.exp((Math.random() - 0.5) * 0.14) + (1 - btc) * 0.01));
+  for (const c of countries) {
+    if (c.dead) continue;
+    c.gold += netIncome(c);
+    if (c.gold < 0) { c.gold = 0; c.units.soldier = Math.max(0, c.units.soldier - 1); }
+    c.wood += c.woodRate + (c === player ? 0 : 1);
+    if (c.pop < c.popCap) c.pop = Math.min(c.popCap, c.pop + 1);
+  }
+  if (gt % 2 === 0) for (const w of wars.slice()) fight(w);
+  aiBrain();
+  if (gt % 6 === 0) aiDiplomacy();
+  if (gt % 5 === 0) allyRequestCheck();
+  if (dirtyMap && gt % 2 === 0) { rebuildBorders(); drawMinimap(); dirtyMap = false; }
+  updateUI();
+  if (panelOpen && tab !== 'saves' && (dirtyPanel || gt % 2 === 0)) renderPanel();
+}
+
+// ================= UI: panels & popups =================
+const panelEl = document.getElementById('panel'), panelBody = document.getElementById('panel-body'), panelTitle = document.getElementById('panel-title');
+const popupEl = document.getElementById('popup');
+let panelOpen = false, tab = 'nations', selectedId = -1, sortKey = 'influence', sortDir = -1;
+const TAB_TITLES = { companies: '🏢 Companies', military: '🪖 Military', nations: '🌍 Nations', log: '📰 News', saves: '💾 Saves' };
+function setTab(t) {
+  if (panelOpen && tab === t) { panelOpen = false; } else { tab = t; panelOpen = true; }
+  panelEl.hidden = !panelOpen;
+  document.querySelectorAll('#menu button').forEach(b => b.classList.toggle('active', panelOpen && b.dataset.tab === tab));
+  if (panelOpen) { panelBody.scrollTop = 0; renderPanel(); }
+}
+function selectCountry(id, open) { selectedId = id; if (open) { panelOpen = false; setTab('nations'); } else renderPanel(); }
+document.querySelectorAll('#menu button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+document.getElementById('panel-close').addEventListener('click', () => setTab(tab));
+
+function popup(html, buttons, ttl = 20000) {
+  popupOpen = true; popupEl.hidden = false; popupEl.innerHTML = `<div>${html}</div><div class="btns"></div>`;
+  const box = popupEl.querySelector('.btns'); let done = false;
+  const close = (fn) => { if (done) return; done = true; popupEl.hidden = true; popupOpen = false; if (fn) fn(); };
+  for (const b of buttons) { const el = document.createElement('button'); el.textContent = b.label; el.onclick = () => close(b.fn); box.appendChild(el); }
+  setTimeout(() => close(), ttl);
+}
+
+const relation = c => player.allies.has(c.id) ? 'ally' : warBetween(player.id, c.id) ? 'war' : 'neutral';
+const btn = (act, label, disabled, data = '') => `<button class="ab" data-act="${act}" ${data} ${disabled ? 'disabled' : ''}>${label}</button>`;
+
+function renderPanel() {
+  dirtyPanel = false;
+  if (tab === 'saves') { renderSaves(); return; }
+  delete panelBody.dataset.saves;
+  panelTitle.textContent = TAB_TITLES[tab];
+  const top = panelBody.scrollTop;
+  let h = '';
+  if (tab === 'companies') {
+    const dir = btc >= btcPrev ? '▲' : '▼';
+    h += `<div class="sub">Company income <b>+${companyIncome(player).toFixed(1)}/s</b> · Bitcoin price <b>×${btc.toFixed(2)} ${dir}</b><br>Each extra company of the same kind costs 40% more.</div>`;
+    h += brandCards();
+    h += '<div class="sub"><b>Found a new company</b> — you choose its name, logo and product.</div>';
+    for (const k in COMPANIES) {
+      const C = COMPANIES[k], n = player.companies[k] || 0, cost = companyCost(player, k);
+      h += `<div class="row"><div class="ic">${C.icon}</div><div class="grow"><b>${C.name}</b>${n ? ` <span class="tag">×${n}</span>` : ''}<br><small>+${C.income}${k === 'btc' ? ' ×price' : ''}/s · +${C.inf} influence${C.note ? ' · ' + C.note : ''}</small></div>${btn('found', `Found · 💰${fmt(cost)}`, false, `data-k="${k}"`)}</div>`;
+    }
+  } else if (tab === 'military') {
+    h += `<div class="sub">Own power <b>${fmt(power(player))}</b> (allies add 35% of theirs: <b>${fmt(effPower(player))}</b> effective)<br>Upkeep <b>-${upkeep(player).toFixed(1)}/s</b>${player.companies.arms ? ` · arms discount ${Math.min(40, player.companies.arms * 8)}%` : ''}</div>`;
+    for (const k in UNITS) {
+      const U = UNITS[k], cost = unitCost(player, k);
+      h += `<div class="row"><div class="ic">${U.icon}</div><div class="grow"><b>${U.name}</b> <span class="tag">${player.units[k]}</span><br><small>power ${U.power} each · upkeep ${U.upkeep}/s · 💰 ${cost}</small></div>${btn('buyunit', '+1', player.gold < cost, `data-k="${k}" data-n="1"`)}${btn('buyunit', '+10', player.gold < cost * 10, `data-k="${k}" data-n="10"`)}</div>`;
+    }
+    const mine = wars.filter(w => w.a === player.id || w.b === player.id);
+    h += `<div class="sub">${mine.length ? '<b>Active wars</b>' : 'You are at peace.'}</div>`;
+    for (const w of mine) {
+      const e = countries[w.a === player.id ? w.b : w.a], lost = w.a === player.id ? w.lostA : w.lostB, won = w.a === player.id ? w.lostB : w.lostA;
+      const mineP = effPower(player), theirP = effPower(e);
+      h += `<div class="row war"><div class="grow"><b>vs ${e.name}</b><br><small>You ${fmt(mineP)} · Them ${fmt(theirP)} · lost ${lost} tiles · took ${won} · ${mmss(gt - w.start)}</small></div>${btn('peace', '🕊️ Peace', false, `data-id="${e.id}"`)}</div>`;
+    }
+  } else if (tab === 'log') {
+    h += logs.length ? logs.map(l => `<div class="log ${l.cls}"><small>${mmss(l.t)}</small> ${l.msg}</div>`).join('') : '<div class="sub">Nothing has happened yet.</div>';
+  } else {
+    const sel = selectedId >= 0 ? countries[selectedId] : null;
+    if (sel && !sel.dead) h += nationCard(sel);
+    const rows = alive().concat([player]).filter(c => !c.dead);
+    const val = { name: c => c.name, gold: c => c.gold, power: c => effPower(c), influence: c => c.influence, pop: c => c.pop }[sortKey];
+    rows.sort((a, b) => sortKey === 'name' ? sortDir * a.name.localeCompare(b.name) : sortDir * (val(a) - val(b)));
+    const th = (k, l) => `<th data-act="sort" data-k="${k}">${l}${sortKey === k ? (sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`;
+    h += `<table><tr>${th('name', 'Nation')}${th('gold', '💰 Money')}${th('power', '⚔️ Power')}${th('influence', '⭐ Influence')}${th('pop', '👥 Pop')}</tr>`;
+    for (const c of rows) {
+      const rel = c === player ? 'me' : relation(c), mark = rel === 'ally' ? '🤝' : rel === 'war' ? '⚔️' : '';
+      h += `<tr class="${rel} ${c.id === selectedId ? 'sel' : ''}" data-act="sel" data-id="${c.id}"><td><i style="background:#${c.color.getHexString()}"></i>${mark} ${c.name}</td><td>${fmt(c.gold)}</td><td>${fmt(effPower(c))}${c.allies.size ? ` <small>(${fmt(power(c))} own)</small>` : ''}</td><td>${fmt(c.influence)}</td><td>${fmt(c.pop)}</td></tr>`;
+    }
+    h += '</table><div class="sub">Click a nation (or its land on the map) to see details and deal with it.</div>';
+  }
+  panelBody.innerHTML = h;
+  panelBody.scrollTop = top;
+}
+function nationCard(c) {
+  const rel = relation(c), w = warBetween(player.id, c.id), tl = truceLeft(player.id, c.id);
+  const u = Object.keys(UNITS).filter(k => c.units[k]).map(k => `${UNITS[k].icon}${c.units[k]}`).join(' ') || 'none';
+  const cos = Object.keys(c.companies).filter(k => c.companies[k]).map(k => COMPANIES[k].icon + (c.companies[k] > 1 ? '×' + c.companies[k] : '')).join(' ') || 'none';
+  const allies = [...c.allies].map(id => countries[id].name).join(', ') || 'none';
+  const foes = wars.filter(x => x.a === c.id || x.b === c.id).map(x => countries[x.a === c.id ? x.b : x.a].name).join(', ') || 'none';
+  const cd = k => { const s = cdLeft(c, k); return s ? ` (${s}s)` : ''; };
+  const mine = effPower(player), theirs = effPower(c);
+  const status = rel === 'ally' ? '🤝 Ally' : rel === 'war' ? '⚔️ At war with you' : tl ? `🕊️ Truce ${tl}s` : 'Neutral';
+  return `<div class="card"><div class="ch"><i style="background:#${c.color.getHexString()}"></i><b>${c.name}</b> <span class="tag">${CONTINENT_NAMES[c.continent]}</span> <span class="tag">${status}</span></div>
+  <div class="grid"><span>💰 ${fmt(c.gold)} <small>(${netIncome(c) >= 0 ? '+' : ''}${netIncome(c).toFixed(1)}/s)</small></span><span>⭐ ${fmt(c.influence)}</span><span>👥 ${fmt(c.pop)}/${fmt(c.popCap)}</span><span>🗺️ ${c.tiles.length} tiles</span><span>⚔️ ${fmt(power(c))} <small>(eff. ${fmt(theirs)})</small></span></div>
+  <small>Units: ${u}<br>Companies: ${cos}<br>Allies: ${allies}<br>At war with: ${foes}</small>
+  <div class="odds">${oddsHTML(c)}</div>
+  <div class="btns2">
+   ${rel === 'ally' ? btn('unally', '💔 Break alliance', false, `data-id="${c.id}"`) : btn('ally', `🤝 Ally${cd('ally')}`, !!cdLeft(c, 'ally') || !!w, `data-id="${c.id}"`)}
+   ${w ? btn('peace', '🕊️ Peace', false, `data-id="${c.id}"`) : btn('war', '⚔️ Declare war', rel === 'ally', `data-id="${c.id}"`)}
+   ${btn('money', `💰 Ask money${cd('money')}`, !!cdLeft(c, 'money') || !!w, `data-id="${c.id}"`)}
+   ${btn('land', `🗺️ Ask land${cd('land')}`, !!cdLeft(c, 'land') || !!w, `data-id="${c.id}"`)}
+   ${btn('goto', '📍 Go to', false, `data-id="${c.id}"`)}
+  </div></div>`;
+}
+panelBody.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
+  const act = el.dataset.act, c = el.dataset.id !== undefined ? countries[+el.dataset.id] : null;
+  if (act === 'found') { openWizard(el.dataset.k); return; }
+  else if (act === 'saveslot') { saveSlot(el.dataset.s).then(() => { if (tab === 'saves' && panelOpen) renderSaves(); }); return; }
+  else if (act === 'loadslot') { const s = el.dataset.s; popup(`<b>📂 Load ${slotName(s)}?</b><br>Your current game is replaced (the autosave keeps the last 30 seconds).`, [{ label: 'Load', fn: () => loadSlot(s) }, { label: 'Cancel' }], 1e9); return; }
+  else if (act === 'delslot') { const s = el.dataset.s; popup(`<b>🗑️ Delete ${slotName(s)}?</b>`, [{ label: 'Delete', fn: () => delSlot(s).then(() => { if (tab === 'saves' && panelOpen) renderSaves(); }) }, { label: 'Cancel' }], 1e9); return; }
+  else if (act === 'exportcode') { exportCode(); return; }
+  else if (act === 'copycode') { copyCode(); return; }
+  else if (act === 'importcode') { const b = document.getElementById('codebox'); loadCode(b ? b.value : ''); return; }
+  else if (act === 'buyco') buyCompany(el.dataset.k);
+  else if (act === 'buyunit') buyUnit(el.dataset.k, +el.dataset.n);
+  else if (act === 'sel') selectedId = c.id;
+  else if (act === 'sort') { const k = el.dataset.k; if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = k === 'name' ? 1 : -1; } }
+  else if (act === 'ally') proposeAlliance(c);
+  else if (act === 'unally') breakAlliance(c);
+  else if (act === 'war') playerDeclareWar(c);
+  else if (act === 'peace') { const w = warBetween(player.id, c.id); if (w) askPeace(w); }
+  else if (act === 'money') askMoney(c);
+  else if (act === 'land') askLand(c);
+  else if (act === 'goto') moveTo(c.capital.px, c.capital.pz);
+  updateUI(); renderPanel();
+});
+
+
+// ================= COMPANY WIZARD: name it, design the logo, design the product =================
+const PALETTE = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#ec4899', '#f8fafc', '#94a3b8', '#1e293b'];
+const SHAPES = [['circle', 'Circle'], ['shield', 'Shield'], ['hex', 'Hexagon'], ['diamond', 'Diamond'], ['square', 'Rounded'], ['star', 'Star']];
+const LOGO_ICONS = ['', '⚡', '🔥', '🌟', '🦅', '🐺', '🦁', '🐉', '🌊', '🏔️', '🌿', '💎', '🚀', '⚙️', '🧬', '☀️', '🌙', '🍀', '🔷', '🦊'];
+const P = (v, l, o = {}) => ({ v, l, ...o });
+const esc2 = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const pickRandom = a => a[Math.floor(Math.random() * a.length)];
+
+// Each company type: name pieces for the random-name button, the design fields (text / pick / color), and a small SVG artwork of the product.
+// A pick option may carry income (fraction of base income), inf (flat influence) and cost (fraction of base price).
+const WIZ = {
+  car: { pre: ['Aero', 'Vanta', 'Nova', 'Torq', 'Zephyr', 'Orion', 'Kestrel', 'Volt'], suf: ['Motors', 'Automotive', 'Cars', 'Auto Works'], fields: [
+    { id: 'model', t: 'text', l: 'Flagship model name', def: 'Meteor GT', max: 16 },
+    { id: 'body', t: 'pick', l: 'Body style', o: [P('sedan', 'Sedan'), P('suv', 'SUV', { income: .08 }), P('coupe', 'Sports coupe', { income: .14, cost: .1 }), P('pickup', 'Pickup truck', { income: .05, inf: 2 }), P('hatch', 'Hatchback', { cost: -.05 }), P('limo', 'Luxury limousine', { income: .18, cost: .2, inf: 3 })] },
+    { id: 'color', t: 'color', l: 'Signature paint' },
+    { id: 'power', t: 'pick', l: 'Powertrain', o: [P('gas', 'Gasoline'), P('hybrid', 'Hybrid', { inf: 2, income: .04 }), P('ev', 'Fully electric', { inf: 5, cost: .1 }), P('h2', 'Hydrogen fuel cell', { inf: 8, cost: .2 })] }] },
+  phone: { pre: ['Nex', 'Lumo', 'Pixa', 'Zen', 'Orbit', 'Halo', 'Tela', 'Voxa'], suf: ['Mobile', 'Telecom', 'Wireless', 'Phones'], fields: [
+    { id: 'model', t: 'text', l: 'Flagship phone name', def: 'Nova X', max: 16 },
+    { id: 'form', t: 'pick', l: 'Form factor', o: [P('slab', 'Classic slab'), P('fold', 'Foldable', { income: .15, cost: .15 }), P('flip', 'Flip phone', { income: .06 }), P('rugged', 'Rugged outdoor', { inf: 2, income: .04 })] },
+    { id: 'color', t: 'color', l: 'Phone colour' },
+    { id: 'os', t: 'pick', l: 'Operating system', o: [P('own', 'Own app store', { income: .08 }), P('open', 'Open-source OS', { inf: 3 }), P('privacy', 'Privacy-first OS', { inf: 5, cost: .05 })] }] },
+  btc: { pre: ['Sato', 'Hash', 'Block', 'Chain', 'Ore', 'Giga', 'Lode', 'Nonce'], suf: ['Mining', 'Digital', 'Labs', 'Ledger'], fields: [
+    { id: 'model', t: 'text', l: 'Coin name', def: 'Satoshium', max: 14 },
+    { id: 'sym', t: 'text', l: 'Ticker symbol', def: 'SATO', max: 4 },
+    { id: 'rig', t: 'pick', l: 'Mining hardware', o: [P('gpu', 'GPU farm'), P('asic', 'ASIC hall', { income: .12, cost: .1 }), P('solar', 'Solar-powered rigs', { inf: 4, cost: .1 }), P('immersion', 'Immersion-cooled', { income: .18, cost: .25 })] },
+    { id: 'color', t: 'color', l: 'Coin colour' },
+    { id: 'site', t: 'pick', l: 'Data-centre site', o: [P('arctic', 'Arctic (cheap cooling)', { income: .08 }), P('desert', 'Desert solar farm', { inf: 2 }), P('hydro', 'Next to a hydro dam', { income: .05, inf: 2 }), P('ware', 'City warehouse', { cost: -.08 })] }] },
+  game: { pre: ['Pixel', 'Ember', 'Quest', 'Moon', 'Rift', 'Glitch', 'Neon', 'Dice'], suf: ['Games', 'Interactive', 'Studios', 'Entertainment'], fields: [
+    { id: 'model', t: 'text', l: 'Flagship game title', def: 'Dragonfall', max: 18 },
+    { id: 'genre', t: 'pick', l: 'Genre', o: [P('rpg', 'Fantasy RPG', { income: .1 }), P('shooter', 'Shooter', { income: .14 }), P('racing', 'Racing'), P('puzzle', 'Puzzle', { cost: -.1 }), P('sim', 'City sim', { inf: 2 }), P('horror', 'Horror', { income: .05 })] },
+    { id: 'color', t: 'color', l: 'Cover colour' },
+    { id: 'platform', t: 'pick', l: 'Platform', o: [P('mobile', 'Mobile', { cost: -.05 }), P('console', 'Console', { income: .1, cost: .1 }), P('pc', 'PC'), P('vr', 'VR headset', { inf: 4, cost: .2 })] }] },
+  ship: { pre: ['Blue', 'Atlas', 'Swift', 'Harbor', 'Meridian', 'Titan', 'Anchor', 'Cargo'], suf: ['Logistics', 'Freight', 'Shipping', 'Express'], fields: [
+    { id: 'model', t: 'text', l: 'Service name', def: 'Blue Line', max: 16 },
+    { id: 'fleet', t: 'pick', l: 'Fleet', o: [P('container', 'Container ships'), P('tanker', 'Tankers', { income: .06 }), P('drone', 'Delivery drones', { inf: 4, cost: .15 }), P('rail', 'Freight trains', { income: .04 }), P('air', 'Cargo planes', { income: .12, cost: .2 })] },
+    { id: 'color', t: 'color', l: 'Livery colour' },
+    { id: 'service', t: 'pick', l: 'Service level', o: [P('std', 'Standard'), P('express', 'Express', { income: .1, cost: .1 }), P('bulk', 'Bulk & cheap', { cost: -.08 })] }] },
+  air: { pre: ['Sky', 'Aero', 'Cirrus', 'Jet', 'Zephyr', 'Falcon', 'Horizon', 'Alto'], suf: ['Airways', 'Airlines', 'Air', 'Aviation'], fields: [
+    { id: 'model', t: 'text', l: 'Hub airport code', def: 'SKY', max: 4 },
+    { id: 'plane', t: 'pick', l: 'Main aircraft', o: [P('reg', 'Regional jet', { cost: -.1 }), P('narrow', 'Narrow-body'), P('jumbo', 'Jumbo jet', { income: .12, cost: .15 }), P('super', 'Supersonic', { income: .2, inf: 5, cost: .3 })] },
+    { id: 'color', t: 'color', l: 'Livery colour' },
+    { id: 'tier', t: 'pick', l: 'Service', o: [P('budget', 'Budget', { cost: -.05 }), P('full', 'Full service'), P('lux', 'Luxury & charter', { income: .15, inf: 3 })] }] },
+  bank: { pre: ['Gold', 'Iron', 'Crown', 'Union', 'Sterling', 'Vault', 'Ledger', 'Atlas'], suf: ['Bank', 'Trust', 'Capital', 'Savings'], fields: [
+    { id: 'model', t: 'text', l: 'Motto', def: 'Safe as stone', max: 24 },
+    { id: 'kind', t: 'pick', l: 'Type of bank', o: [P('retail', 'Retail bank'), P('invest', 'Investment bank', { income: .15, cost: .15 }), P('digital', 'Digital-only bank', { inf: 3, cost: -.05 }), P('coop', 'Co-operative', { inf: 4 })] },
+    { id: 'color', t: 'color', l: 'Brand colour' },
+    { id: 'card', t: 'pick', l: 'Flagship card', o: [P('gold', 'Gold card'), P('plat', 'Platinum card', { income: .06 }), P('black', 'Black card', { income: .1, inf: 2, cost: .1 })] }] },
+  pharma: { pre: ['Vita', 'Novo', 'Gene', 'Cura', 'Medi', 'Helix', 'Pure', 'Lumen'], suf: ['Pharma', 'Biotech', 'Therapeutics', 'Labs'], fields: [
+    { id: 'model', t: 'text', l: 'Flagship drug name', def: 'Curalex', max: 14 },
+    { id: 'cat', t: 'pick', l: 'Category', o: [P('vax', 'Vaccines', { inf: 3 }), P('pain', 'Painkillers', { income: .1 }), P('gene', 'Gene therapy', { income: .18, cost: .25 }), P('anti', 'Antibiotics')] },
+    { id: 'color', t: 'color', l: 'Pill colour' },
+    { id: 'trial', t: 'pick', l: 'Approach', o: [P('fast', 'Fast-track trials', { income: .08, cost: .05 }), P('std', 'Standard trials'), P('open', 'Open-source formula', { inf: 6, cost: -.05 })] }] },
+  oil: { pre: ['Black', 'Deep', 'Prime', 'Terra', 'Magna', 'Blaze', 'Delta', 'Crude'], suf: ['Petroleum', 'Energy', 'Oil & Gas', 'Resources'], fields: [
+    { id: 'model', t: 'text', l: 'Flagship field name', def: 'Field Alpha', max: 16 },
+    { id: 'site', t: 'pick', l: 'Operation', o: [P('land', 'Onshore wells'), P('sea', 'Offshore platform', { income: .12, cost: .15 }), P('arctic', 'Arctic drilling', { income: .2, cost: .25 }), P('lng', 'LNG terminal', { inf: 3, income: .06 })] },
+    { id: 'color', t: 'color', l: 'Company colour' },
+    { id: 'stance', t: 'pick', l: 'Strategy', o: [P('fossil', 'Pure fossil', { income: .08 }), P('mixed', 'Transition plan', { inf: 5 })] }] },
+  energy: { pre: ['Sun', 'Gale', 'Terra', 'Aqua', 'Volt', 'Zero', 'Helio', 'Verde'], suf: ['Power', 'Energy', 'Renewables', 'Grid'], fields: [
+    { id: 'model', t: 'text', l: 'Flagship plant name', def: 'Sunfield One', max: 16 },
+    { id: 'src', t: 'pick', l: 'Energy source', o: [P('solar', 'Solar farm'), P('wind', 'Wind farm', { income: .04 }), P('hydro', 'Hydro dam', { income: .08, cost: .1 }), P('geo', 'Geothermal', { inf: 3, cost: .1 }), P('fusion', 'Fusion pilot', { income: .25, inf: 8, cost: .4 })] },
+    { id: 'color', t: 'color', l: 'Brand colour' },
+    { id: 'store', t: 'pick', l: 'Storage', o: [P('bat', 'Battery banks', { income: .05 }), P('pump', 'Pumped hydro', { inf: 2 }), P('none', 'No storage', { cost: -.1 })] }] },
+  chip: { pre: ['Silic', 'Quanta', 'Nano', 'Flux', 'Ion', 'Core', 'Etch', 'Photon'], suf: ['Semiconductors', 'Microsystems', 'Silicon', 'Chips'], fields: [
+    { id: 'model', t: 'text', l: 'Chip name', def: 'Quantum Q1', max: 16 },
+    { id: 'node', t: 'pick', l: 'Process node', o: [P('28', '28 nm (cheap, reliable)', { cost: -.1 }), P('7', '7 nm'), P('5', '5 nm', { income: .1, cost: .15 }), P('3', '3 nm (cutting edge)', { income: .2, inf: 4, cost: .3 })] },
+    { id: 'color', t: 'color', l: 'Die colour' },
+    { id: 'focus', t: 'pick', l: 'Focus', o: [P('cpu', 'CPUs'), P('gpu', 'Graphics chips', { income: .08 }), P('ai', 'AI accelerators', { income: .15, inf: 3 }), P('mem', 'Memory', { cost: -.05 })] }] },
+  arms: { pre: ['Iron', 'Falcon', 'Ares', 'Bastion', 'Sentinel', 'Viper', 'Titan', 'Aegis'], suf: ['Defense', 'Arms', 'Dynamics', 'Armaments'], fields: [
+    { id: 'model', t: 'text', l: 'Flagship system name', def: 'Sentinel-1', max: 16 },
+    { id: 'kind', t: 'pick', l: 'Product', o: [P('rifle', 'Infantry rifle'), P('armor', 'Armoured vehicle', { income: .08 }), P('drone', 'Combat drone', { income: .12, cost: .15 }), P('missile', 'Missile system', { income: .18, cost: .25 }), P('naval', 'Warship', { income: .14, cost: .2 })] },
+    { id: 'color', t: 'color', l: 'Camouflage tone' },
+    { id: 'policy', t: 'pick', l: 'Sales policy', o: [P('home', 'Domestic only', { inf: 3 }), P('export', 'Export to allies', { income: .12 })] }] },
+  ai: { pre: ['Neuro', 'Cogni', 'Syn', 'Mind', 'Deep', 'Logic', 'Cortex', 'Axiom'], suf: ['AI', 'Intelligence', 'Robotics', 'Labs'], fields: [
+    { id: 'model', t: 'text', l: 'Model name', def: 'Cortex-1', max: 16 },
+    { id: 'focus', t: 'pick', l: 'Focus', o: [P('chat', 'Chat assistant', { income: .1 }), P('robot', 'Robotics', { income: .06, inf: 3 }), P('vision', 'Computer vision'), P('science', 'Scientific discovery', { inf: 6, cost: .1 })] },
+    { id: 'color', t: 'color', l: 'Accent colour' },
+    { id: 'open', t: 'pick', l: 'Release policy', o: [P('closed', 'Closed models', { income: .1 }), P('open', 'Open weights', { inf: 6 })] }] },
+  space: { pre: ['Star', 'Apollo', 'Nova', 'Cosmo', 'Orbit', 'Lunar', 'Vega', 'Astra'], suf: ['Aerospace', 'Space', 'Launch', 'Astronautics'], fields: [
+    { id: 'model', t: 'text', l: 'Rocket name', def: 'Falcon-X', max: 16 },
+    { id: 'mission', t: 'pick', l: 'Main mission', o: [P('sat', 'Satellite launches', { income: .1 }), P('moon', 'Moon base', { inf: 8, cost: .15 }), P('mars', 'Mars colony', { inf: 14, cost: .3 }), P('tour', 'Space tourism', { income: .2, cost: .1 })] },
+    { id: 'color', t: 'color', l: 'Rocket colour' },
+    { id: 'reuse', t: 'pick', l: 'Rocket type', o: [P('reuse', 'Reusable boosters', { income: .12, cost: .1 }), P('one', 'Expendable', { cost: -.1 })] }] }
+};
+
+// ---- artwork (viewBox 0 0 240 130) ----
+const COLOR_LABEL = { light: '#e2e8f0', dark: '#0f172a' };
+function logoSVG(b, size = 64) {
+  const c1 = b.c1, c2 = b.c2;
+  const shapes = {
+    circle: `<circle cx="32" cy="32" r="29" fill="${c1}" stroke="${c2}" stroke-width="4"/>`,
+    shield: `<path d="M32 4 L56 12 V32 C56 46 46 56 32 61 C18 56 8 46 8 32 V12 Z" fill="${c1}" stroke="${c2}" stroke-width="4"/>`,
+    hex: `<polygon points="32,3 57,17 57,47 32,61 7,47 7,17" fill="${c1}" stroke="${c2}" stroke-width="4"/>`,
+    diamond: `<polygon points="32,3 61,32 32,61 3,32" fill="${c1}" stroke="${c2}" stroke-width="4"/>`,
+    square: `<rect x="5" y="5" width="54" height="54" rx="14" fill="${c1}" stroke="${c2}" stroke-width="4"/>`,
+    star: `<polygon points="32,3 40,24 62,24 44,38 51,60 32,46 13,60 20,38 2,24 24,24" fill="${c1}" stroke="${c2}" stroke-width="3"/>`
+  };
+  const glyph = b.icon
+    ? `<text x="32" y="33" font-size="30" text-anchor="middle" dominant-baseline="central">${b.icon}</text>`
+    : `<text x="32" y="34" font-size="26" font-weight="800" font-family="system-ui,sans-serif" text-anchor="middle" dominant-baseline="central" fill="${c2}">${esc2((b.name || '?').trim().slice(0, 2).toUpperCase())}</text>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="${size}" height="${size}">${shapes[b.shape] || shapes.circle}${glyph}</svg>`;
+}
+const wheel = (x, y, r = 14) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#0f172a"/><circle cx="${x}" cy="${y}" r="${r * 0.48}" fill="#cbd5e1"/>`;
+const ART = {
+  car(d) {
+    const c = d.color, bodies = {
+      sedan: `<path d="M30 90 L36 66 Q40 56 54 54 L96 52 Q112 36 132 36 L150 36 Q170 38 182 56 L206 62 Q218 66 218 90 Z" fill="${c}"/>`,
+      suv: `<path d="M26 90 L30 52 Q32 40 46 38 L170 36 Q186 38 190 52 L216 62 Q222 68 222 90 Z" fill="${c}"/>`,
+      coupe: `<path d="M24 90 L40 68 Q60 58 100 56 Q124 38 150 40 Q176 46 190 62 L222 70 Q228 80 224 90 Z" fill="${c}"/>`,
+      pickup: `<path d="M24 90 L28 58 L84 56 L100 36 L146 36 L160 56 L224 58 L226 90 Z" fill="${c}"/>`,
+      hatch: `<path d="M30 90 L34 64 Q40 52 60 50 L120 38 Q150 36 170 44 Q190 52 196 66 L214 72 Q220 80 218 90 Z" fill="${c}"/>`,
+      limo: `<path d="M10 90 L16 68 L92 62 Q112 40 138 40 Q164 42 176 62 L236 66 Q242 76 240 90 Z" fill="${c}"/>`
+    };
+    const mark = { ev: '⚡', h2: '💧', hybrid: '🍃' }[d.power] || '';
+    return `${bodies[d.body] || bodies.sedan}<path d="M104 56 Q118 44 134 44 L150 44 Q164 46 172 58 Z" fill="#bfe3ff" opacity=".85"/>${wheel(70, 92)}${wheel(182, 92)}<text x="206" y="30" font-size="22">${mark}</text><rect x="20" y="106" width="200" height="4" rx="2" fill="#334155"/>`;
+  },
+  phone(d) {
+    const c = d.color, f = d.form, scr = '#10243f';
+    if (f === 'fold') return `<rect x="52" y="14" width="68" height="102" rx="8" fill="${c}"/><rect x="120" y="14" width="68" height="102" rx="8" fill="${c}"/><rect x="57" y="20" width="58" height="90" rx="4" fill="${scr}"/><rect x="125" y="20" width="58" height="90" rx="4" fill="${scr}"/><text x="120" y="70" font-size="26" text-anchor="middle">📱</text>`;
+    if (f === 'flip') return `<rect x="92" y="6" width="56" height="42" rx="10" fill="${c}"/><rect x="92" y="52" width="56" height="72" rx="10" fill="${c}"/><rect x="97" y="11" width="46" height="32" rx="5" fill="${scr}"/><rect x="97" y="58" width="46" height="60" rx="5" fill="${scr}"/>`;
+    if (f === 'rugged') return `<rect x="86" y="4" width="68" height="122" rx="9" fill="#334155"/><rect x="92" y="12" width="56" height="104" rx="5" fill="${c}"/><rect x="97" y="18" width="46" height="92" rx="3" fill="${scr}"/>`;
+    return `<rect x="90" y="4" width="60" height="122" rx="12" fill="${c}"/><rect x="95" y="11" width="50" height="108" rx="7" fill="${scr}"/><circle cx="120" cy="17" r="2.5" fill="#64748b"/><text x="120" y="70" font-size="22" text-anchor="middle">📱</text>`;
+  },
+  btc(d) {
+    const racks = { gpu: '#475569', asic: '#1e293b', solar: '#1d4ed8', immersion: '#0e7490' }[d.rig] || '#475569';
+    let r = ''; for (let i = 0; i < 6; i++) r += `<rect x="${20 + i * 34}" y="96" width="26" height="28" rx="3" fill="${racks}"/><rect x="${24 + i * 34}" y="101" width="18" height="3" fill="#22c55e"/><rect x="${24 + i * 34}" y="108" width="18" height="3" fill="#22c55e"/>`;
+    return `<circle cx="120" cy="48" r="38" fill="${d.color}" stroke="#fff" stroke-opacity=".6" stroke-width="4"/><circle cx="120" cy="48" r="30" fill="none" stroke="#0f172a" stroke-opacity=".35" stroke-width="2"/><text x="120" y="55" font-size="20" font-weight="800" font-family="system-ui,sans-serif" text-anchor="middle" fill="#0f172a">${esc2((d.sym || '').toUpperCase())}</text>${r}`;
+  },
+  game(d) {
+    const ic = { rpg: '⚔️', shooter: '🔫', racing: '🏎️', puzzle: '🧩', sim: '🏙️', horror: '👻' }[d.genre] || '🎮';
+    const pl = { mobile: '📱 Mobile', console: '🎮 Console', pc: '🖥️ PC', vr: '🥽 VR' }[d.platform] || '';
+    return `<rect x="70" y="6" width="100" height="118" rx="8" fill="${d.color}"/><rect x="70" y="6" width="100" height="118" rx="8" fill="#0f172a" opacity=".35"/><text x="120" y="52" font-size="34" text-anchor="middle">${ic}</text><text x="120" y="82" font-size="12" font-weight="800" font-family="system-ui,sans-serif" text-anchor="middle" fill="#fff">${esc2((d.model || '').toUpperCase().slice(0, 16))}</text><text x="120" y="110" font-size="10" font-family="system-ui,sans-serif" text-anchor="middle" fill="#e2e8f0">${pl}</text>`;
+  },
+  ship(d) {
+    const c = d.color;
+    if (d.fleet === 'air') return ART.air({ color: c, plane: 'jumbo' });
+    if (d.fleet === 'rail') return `<rect x="14" y="62" width="212" height="6" fill="#475569"/><rect x="24" y="36" width="60" height="26" rx="4" fill="${c}"/><rect x="88" y="40" width="52" height="22" rx="3" fill="#94a3b8"/><rect x="144" y="40" width="52" height="22" rx="3" fill="#94a3b8"/>${wheel(40, 68, 7)}${wheel(66, 68, 7)}${wheel(104, 68, 7)}${wheel(124, 68, 7)}${wheel(160, 68, 7)}${wheel(180, 68, 7)}`;
+    if (d.fleet === 'drone') return `<g fill="${c}"><rect x="96" y="50" width="48" height="18" rx="6"/><rect x="104" y="68" width="32" height="14" rx="3" fill="#cbd5e1"/></g><path d="M60 46 H96 M144 46 H180" stroke="#94a3b8" stroke-width="5"/><circle cx="60" cy="46" r="9" fill="#475569"/><circle cx="180" cy="46" r="9" fill="#475569"/><circle cx="60" cy="46" r="3" fill="#f8fafc"/><circle cx="180" cy="46" r="3" fill="#f8fafc"/>`;
+    const tank = d.fleet === 'tanker';
+    let cargo = ''; if (!tank) for (let i = 0; i < 5; i++) { cargo += `<rect x="${52 + i * 28}" y="52" width="24" height="16" fill="${['#f97316', '#3b82f6', '#22c55e', '#eab308', '#ef4444'][i]}"/><rect x="${52 + i * 28}" y="36" width="24" height="16" fill="${['#3b82f6', '#ef4444', '#f97316', '#22c55e', '#eab308'][i]}"/>`; }
+    else cargo = `<ellipse cx="110" cy="58" rx="62" ry="10" fill="#475569"/><rect x="48" y="52" width="124" height="14" fill="#64748b"/>`;
+    return `<path d="M20 70 H220 L200 98 H44 Z" fill="${c}"/>${cargo}<rect x="188" y="30" width="22" height="40" fill="#e2e8f0"/><rect x="192" y="36" width="14" height="8" fill="#38bdf8"/><path d="M0 104 Q30 96 60 104 T120 104 T180 104 T240 104 V130 H0 Z" fill="#0ea5e9" opacity=".6"/>`;
+  },
+  air(d) {
+    const c = d.color, L = { reg: 120, narrow: 150, jumbo: 190, super: 170 }[d.plane] || 150, x0 = 120 - L / 2;
+    if (d.plane === 'super') return `<path d="M24 66 L160 60 L218 66 L160 72 Z" fill="#f8fafc"/><path d="M110 62 L150 22 L168 24 L150 62 Z M110 70 L150 110 L168 108 L150 70 Z" fill="${c}"/><path d="M24 66 L44 63 L44 69 Z" fill="${c}"/>`;
+    return `<ellipse cx="120" cy="66" rx="${L / 2}" ry="${d.plane === 'jumbo' ? 15 : 11}" fill="#f8fafc"/><path d="M${x0 + L * 0.42} 62 L${x0 + L * 0.3} 22 L${x0 + L * 0.5} 22 L${x0 + L * 0.7} 62 Z M${x0 + L * 0.42} 70 L${x0 + L * 0.3} 110 L${x0 + L * 0.5} 110 L${x0 + L * 0.7} 70 Z" fill="${c}"/><path d="M${x0 + 8} 60 L${x0 - 2} 36 L${x0 + 18} 36 L${x0 + 34} 60 Z" fill="${c}"/><rect x="${x0 + L * 0.2}" y="62" width="${L * 0.6}" height="4" fill="${c}"/>`;
+  },
+  bank(d) {
+    const c = d.color, card = { gold: '#eab308', plat: '#cbd5e1', black: '#1e293b' }[d.card] || '#eab308';
+    let cols = ''; for (let i = 0; i < 5; i++) cols += `<rect x="${64 + i * 26}" y="56" width="12" height="48" fill="#f1f5f9"/>`;
+    return `<polygon points="52,52 120,16 188,52" fill="${c}"/><rect x="52" y="52" width="136" height="6" fill="#e2e8f0"/>${cols}<rect x="48" y="104" width="144" height="8" fill="#cbd5e1"/><rect x="40" y="112" width="160" height="8" fill="#94a3b8"/><rect x="170" y="84" width="46" height="30" rx="5" fill="${card}" stroke="#0f172a" stroke-opacity=".4"/><rect x="174" y="92" width="14" height="9" rx="2" fill="#fde68a"/><text x="120" y="42" font-size="14" text-anchor="middle">🏦</text>`;
+  },
+  pharma(d) {
+    const ic = { vax: '💉', pain: '💊', gene: '🧬', anti: '🦠' }[d.cat] || '💊';
+    return `<g transform="rotate(-30 120 62)"><rect x="60" y="42" width="60" height="40" rx="20" fill="${d.color}"/><rect x="120" y="42" width="60" height="40" rx="20" fill="#f8fafc"/><rect x="118" y="42" width="4" height="40" fill="#0f172a" opacity=".2"/></g><text x="190" y="40" font-size="28" text-anchor="middle">${ic}</text><text x="120" y="118" font-size="12" font-weight="700" font-family="system-ui,sans-serif" text-anchor="middle" fill="#e2e8f0">${esc2((d.model || '').slice(0, 14))}</text>`;
+  },
+  oil(d) {
+    const c = d.color, sea = '<path d="M0 100 Q30 92 60 100 T120 100 T180 100 T240 100 V130 H0 Z" fill="#0ea5e9" opacity=".6"/>';
+    if (d.site === 'sea') return `${sea}<rect x="70" y="40" width="100" height="8" fill="${c}"/><rect x="76" y="48" width="6" height="52" fill="#475569"/><rect x="158" y="48" width="6" height="52" fill="#475569"/><rect x="110" y="22" width="20" height="18" fill="#e2e8f0"/><path d="M120 6 L128 22 H112 Z" fill="#ef4444"/>`;
+    if (d.site === 'lng') return `<rect x="0" y="100" width="240" height="30" fill="#475569"/><circle cx="90" cy="70" r="30" fill="#e2e8f0" stroke="${c}" stroke-width="5"/><circle cx="160" cy="76" r="24" fill="#e2e8f0" stroke="${c}" stroke-width="5"/>`;
+    const ground = d.site === 'arctic' ? '#e2e8f0' : '#a16207';
+    return `<rect x="0" y="100" width="240" height="30" fill="${ground}"/><path d="M80 100 L120 40 L160 100 Z" fill="none" stroke="${c}" stroke-width="5"/><rect x="108" y="30" width="24" height="10" fill="${c}"/><path d="M150 40 L196 40 L190 60 Z" fill="#475569"/><circle cx="170" cy="86" r="12" fill="${c}"/>`;
+  },
+  energy(d) {
+    const c = d.color, ground = '<rect x="0" y="106" width="240" height="24" fill="#166534"/>';
+    if (d.src === 'wind') return `${ground}<rect x="70" y="40" width="6" height="66" fill="#e2e8f0"/><rect x="150" y="52" width="6" height="54" fill="#e2e8f0"/><g stroke="${c}" stroke-width="5" stroke-linecap="round"><path d="M73 40 L73 8 M73 40 L48 56 M73 40 L98 56"/><path d="M153 52 L153 24 M153 52 L132 64 M153 52 L174 64"/></g>`;
+    if (d.src === 'hydro') return `<rect x="0" y="40" width="240" height="90" fill="#0ea5e9" opacity=".6"/><path d="M80 130 L100 24 H140 L160 130 Z" fill="#94a3b8"/><path d="M100 24 H140" stroke="${c}" stroke-width="6"/><path d="M106 70 q14 -10 28 0" stroke="#e0f2fe" stroke-width="4" fill="none"/>`;
+    if (d.src === 'geo') return `${ground}<path d="M60 106 L100 56 L140 106 Z" fill="#57534e"/><circle cx="100" cy="40" r="10" fill="#f1f5f9"/><circle cx="116" cy="22" r="14" fill="#f1f5f9" opacity=".8"/><rect x="150" y="70" width="40" height="36" fill="${c}"/><rect x="190" y="52" width="8" height="54" fill="#cbd5e1"/>`;
+    if (d.src === 'fusion') return `<circle cx="120" cy="64" r="44" fill="none" stroke="${c}" stroke-width="10"/><circle cx="120" cy="64" r="22" fill="#fde68a"/><circle cx="120" cy="64" r="12" fill="#fff"/>`;
+    let p = ''; for (let i = 0; i < 4; i++) p += `<path d="M${22 + i * 52} 98 L${40 + i * 52} 56 H${78 + i * 52} L${60 + i * 52} 98 Z" fill="${c}" stroke="#e2e8f0" stroke-width="2"/>`;
+    return `${ground}${p}<circle cx="206" cy="26" r="14" fill="#fde047"/>`;
+  },
+  chip(d) {
+    let pins = ''; for (let i = 0; i < 6; i++) pins += `<rect x="${78 + i * 14}" y="14" width="6" height="12" fill="#cbd5e1"/><rect x="${78 + i * 14}" y="104" width="6" height="12" fill="#cbd5e1"/><rect x="62" y="${30 + i * 12}" width="12" height="6" fill="#cbd5e1"/><rect x="166" y="${30 + i * 12}" width="12" height="6" fill="#cbd5e1"/>`;
+    const lab = { cpu: 'CPU', gpu: 'GPU', ai: 'AI', mem: 'RAM' }[d.focus] || '';
+    return `${pins}<rect x="72" y="24" width="96" height="82" rx="8" fill="#1e293b" stroke="${d.color}" stroke-width="4"/><rect x="88" y="40" width="64" height="50" rx="4" fill="${d.color}" opacity=".85"/><text x="120" y="62" font-size="16" font-weight="800" font-family="system-ui,sans-serif" text-anchor="middle" fill="#0f172a">${lab}</text><text x="120" y="80" font-size="12" font-family="system-ui,sans-serif" text-anchor="middle" fill="#0f172a">${esc2(d.node)} nm</text>`;
+  },
+  arms(d) {
+    const c = d.color;
+    if (d.kind === 'armor') return `<rect x="50" y="64" width="140" height="30" rx="10" fill="${c}"/><rect x="82" y="42" width="70" height="26" rx="8" fill="${c}"/><rect x="148" y="48" width="64" height="7" fill="#475569"/>${wheel(70, 100, 11)}${wheel(100, 100, 11)}${wheel(130, 100, 11)}${wheel(160, 100, 11)}`;
+    if (d.kind === 'drone') return `<ellipse cx="120" cy="66" rx="30" ry="12" fill="${c}"/><path d="M60 54 H180" stroke="#475569" stroke-width="5"/><ellipse cx="62" cy="52" rx="20" ry="4" fill="#94a3b8"/><ellipse cx="178" cy="52" rx="20" ry="4" fill="#94a3b8"/><rect x="112" y="78" width="16" height="10" fill="#475569"/>`;
+    if (d.kind === 'missile') return `<g transform="rotate(-20 120 64)"><rect x="40" y="54" width="130" height="20" rx="4" fill="#e2e8f0"/><path d="M170 54 L214 64 L170 74 Z" fill="${c}"/><path d="M40 54 L24 40 L56 54 Z M40 74 L24 88 L56 74 Z" fill="${c}"/></g><path d="M20 112 Q40 100 60 112 T100 112" stroke="#94a3b8" stroke-width="5" fill="none"/>`;
+    if (d.kind === 'naval') return `<path d="M20 70 H220 L200 96 H44 Z" fill="${c}"/><rect x="90" y="46" width="60" height="24" fill="#94a3b8"/><rect x="104" y="30" width="30" height="16" fill="#cbd5e1"/><rect x="156" y="52" width="40" height="5" fill="#475569"/><path d="M0 104 Q30 96 60 104 T120 104 T180 104 T240 104 V130 H0 Z" fill="#0ea5e9" opacity=".6"/>`;
+    return `<rect x="30" y="64" width="150" height="14" rx="3" fill="#475569"/><rect x="170" y="68" width="44" height="6" fill="#1e293b"/><rect x="70" y="76" width="22" height="30" rx="3" fill="${c}"/><rect x="100" y="48" width="40" height="18" rx="3" fill="${c}"/>`;
+  },
+  ai(d) {
+    const e = d.color;
+    return `<rect x="78" y="22" width="84" height="74" rx="16" fill="#334155" stroke="${e}" stroke-width="4"/><circle cx="104" cy="56" r="10" fill="${e}"/><circle cx="136" cy="56" r="10" fill="${e}"/><rect x="104" y="76" width="32" height="6" rx="3" fill="${e}"/><rect x="116" y="8" width="8" height="14" fill="#94a3b8"/><circle cx="120" cy="8" r="5" fill="${e}"/><rect x="92" y="96" width="56" height="22" rx="6" fill="#475569"/><text x="190" y="40" font-size="22">${{ chat: '💬', robot: '🦾', vision: '👁️', science: '🔬' }[d.focus] || '🤖'}</text>`;
+  },
+  space(d) {
+    const c = d.color, bg = { moon: '<circle cx="190" cy="34" r="22" fill="#cbd5e1"/>', mars: '<circle cx="190" cy="34" r="22" fill="#ea580c"/>', sat: '<rect x="170" y="26" width="30" height="10" fill="#38bdf8"/><rect x="180" y="20" width="10" height="22" fill="#94a3b8"/>', tour: '<text x="190" y="42" font-size="26" text-anchor="middle">🌍</text>' }[d.mission] || '';
+    const legs = d.reuse === 'reuse' ? '<path d="M104 104 L92 120 M136 104 L148 120" stroke="#e2e8f0" stroke-width="4"/>' : '';
+    return `${bg}<path d="M120 6 Q140 30 140 60 V104 H100 V60 Q100 30 120 6 Z" fill="#f8fafc"/><circle cx="120" cy="48" r="9" fill="#38bdf8" stroke="${c}" stroke-width="3"/><path d="M100 80 L82 104 H100 Z M140 80 L158 104 H140 Z" fill="${c}"/><path d="M108 104 L120 128 L132 104 Z" fill="#f97316"/>${legs}<circle cx="40" cy="30" r="1.5" fill="#fff"/><circle cx="60" cy="90" r="1.5" fill="#fff"/><circle cx="210" cy="96" r="1.5" fill="#fff"/>`;
+  }
+};
+const artSVG = (k, d) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 130" width="100%" height="130">${ART[k] ? ART[k](d) : ''}</svg>`;
+
+function designSummary(k, d) {
+  const W = WIZ[k], out = [];
+  for (const f of W.fields) {
+    if (f.t === 'text') { if (d[f.id]) out.push(`“${d[f.id]}”`); }
+    else if (f.t === 'pick') { const o = f.o.find(x => x.v === d[f.id]); if (o) out.push(o.l); }
+  }
+  return out.join(' · ');
+}
+function designMods(k, d) {
+  const m = { income: 0, inf: 0, cost: 0 };
+  for (const f of WIZ[k].fields) if (f.t === 'pick') { const o = f.o.find(x => x.v === d[f.id]); if (o) { m.income += o.income || 0; m.inf += o.inf || 0; m.cost += o.cost || 0; } }
+  return m;
+}
+function brandName(k) { const W = WIZ[k]; return pickRandom(W.pre) + ' ' + pickRandom(W.suf); }
+function companyQuote(k, d, b) {
+  const C = COMPANIES[k], m = designMods(k, d);
+  const cost = Math.max(20, Math.round(companyCost(player, k) * (1 + m.cost)));
+  return { cost, income: C.income * (1 + m.income), inf: C.inf + m.inf, mods: m };
+}
+
+// ---- the wizard window ----
+const wizEl = document.getElementById('wizard');
+let wiz = null;
+function wizSteps(k) {
+  const steps = [{ kind: 'brand', title: '1 · Name your company' }, { kind: 'logo', title: '2 · Design the logo' }];
+  const fs = WIZ[k].fields;
+  for (let i = 0; i < fs.length; i += 2) steps.push({ kind: 'design', fields: fs.slice(i, i + 2), title: `${steps.length + 1} · ${i === 0 ? 'Design the product' : 'Finishing touches'}` });
+  steps.push({ kind: 'review', title: `${steps.length + 1} · Review & launch` });
+  return steps;
+}
+function openWizard(k) {
+  const W = WIZ[k], design = {};
+  for (const f of W.fields) design[f.id] = f.t === 'text' ? f.def : f.t === 'color' ? pickRandom(PALETTE.slice(0, 13)) : f.o[0].v;
+  const c1 = pickRandom(PALETTE.slice(0, 13)); let c2 = pickRandom(PALETTE); if (c2 === c1) c2 = '#f8fafc';
+  wiz = { k, step: 0, design, brand: { name: brandName(k), slogan: '', shape: pickRandom(SHAPES)[0], icon: pickRandom(LOGO_ICONS.slice(1)), c1, c2 } };
+  wizRender();
+}
+function closeWizard() { wiz = null; wizEl.hidden = true; wizEl.innerHTML = ''; }
+const swatches = (action, cur) => PALETTE.map(c => `<button class="sw ${c === cur ? 'on' : ''}" style="background:${c}" data-w="${action}" data-v="${c}" title="${c}"></button>`).join('');
+function wizPreview() {
+  const b = wiz.brand, d = wiz.design, step = wizSteps(wiz.k)[wiz.step];
+  const q = companyQuote(wiz.k, d, b);
+  let h = `<div class="wz-card"><div class="wz-logo">${logoSVG(b, 76)}</div><div><b class="wz-name">${esc2(b.name || 'Unnamed')}</b><br><i>${esc2(b.slogan || '')}</i></div></div>`;
+  if (step.kind !== 'brand' && step.kind !== 'logo') h += `<div class="wz-art">${artSVG(wiz.k, d)}</div><div class="wz-sum">${esc2(designSummary(wiz.k, d))}</div>`;
+  if (step.kind === 'review') h += `<div class="wz-stats"><span>💰 Cost <b>${fmt(q.cost)}</b></span><span>📈 Income <b>+${q.income.toFixed(1)}/s</b></span><span>⭐ Influence <b>+${q.inf}</b></span></div>`;
+  return h;
+}
+function wizRender() {
+  const W = WIZ[wiz.k], C = COMPANIES[wiz.k], steps = wizSteps(wiz.k), s = steps[wiz.step], b = wiz.brand, d = wiz.design;
+  let body = '';
+  if (s.kind === 'brand') {
+    body = `<label>Company name</label><div class="wz-row"><input data-b="name" maxlength="24" value="${esc2(b.name)}" spellcheck="false"><button data-w="rand">🎲 Random</button></div>
+      <label>Slogan <small>(optional)</small></label><input data-b="slogan" maxlength="40" value="${esc2(b.slogan)}" placeholder="e.g. Built for tomorrow" spellcheck="false">`;
+  } else if (s.kind === 'logo') {
+    body = `<label>Shape</label><div class="wz-opts">${SHAPES.map(([v, l]) => `<button class="opt ${b.shape === v ? 'on' : ''}" data-w="shape" data-v="${v}">${l}</button>`).join('')}</div>
+      <label>Emblem <small>(first one uses your initials)</small></label><div class="wz-opts icons">${LOGO_ICONS.map(i => `<button class="opt ${b.icon === i ? 'on' : ''}" data-w="icon" data-v="${i}">${i || 'Aa'}</button>`).join('')}</div>
+      <label>Main colour</label><div class="wz-sw">${swatches('c1', b.c1)}</div><label>Accent colour</label><div class="wz-sw">${swatches('c2', b.c2)}</div>`;
+  } else if (s.kind === 'design') {
+    for (const f of s.fields) {
+      if (f.t === 'text') body += `<label>${f.l}</label><input data-d="${f.id}" maxlength="${f.max || 20}" value="${esc2(d[f.id])}" spellcheck="false">`;
+      else if (f.t === 'color') body += `<label>${f.l}</label><div class="wz-sw">${swatches('dcolor:' + f.id, d[f.id])}</div>`;
+      else body += `<label>${f.l}</label><div class="wz-opts">${f.o.map(o => {
+        const tags = [o.income ? `${o.income > 0 ? '+' : ''}${Math.round(o.income * 100)}% income` : '', o.inf ? `+${o.inf}⭐` : '', o.cost ? `${o.cost > 0 ? '+' : ''}${Math.round(o.cost * 100)}% cost` : ''].filter(Boolean).join(' · ');
+        return `<button class="opt ${d[f.id] === o.v ? 'on' : ''}" data-w="pick:${f.id}" data-v="${o.v}">${o.l}${tags ? `<small>${tags}</small>` : ''}</button>`;
+      }).join('')}</div>`;
+    }
+  } else {
+    const q = companyQuote(wiz.k, d, b), afford = player.gold >= q.cost;
+    body = `<p>Everything looks ready. Launching <b>${esc2(b.name || 'your company')}</b> as a <b>${C.name}</b>.</p><p class="${afford ? '' : 'bad'}">${afford ? 'You can afford it.' : `You need ${fmt(q.cost - player.gold)} more gold.`}</p>`;
+  }
+  const last = wiz.step === steps.length - 1;
+  wizEl.hidden = false;
+  wizEl.innerHTML = `<div class="wz"><div class="wz-h"><b>${C.icon} Found a ${C.name}</b><button data-w="close">✕</button></div>
+    <div class="wz-title">${s.title}</div><div class="wz-dots">${steps.map((x, i) => `<i class="${i === wiz.step ? 'on' : i < wiz.step ? 'done' : ''}"></i>`).join('')}</div>
+    <div class="wz-grid"><div class="wz-form">${body}</div><div class="wz-prev" id="wz-prev">${wizPreview()}</div></div>
+    <div class="wz-foot"><button data-w="back" ${wiz.step === 0 ? 'disabled' : ''}>← Back</button>${last ? `<button class="go" data-w="launch">🚀 Launch for 💰${fmt(companyQuote(wiz.k, d, b).cost)}</button>` : '<button class="go" data-w="next">Next →</button>'}</div></div>`;
+}
+function launchCompany() {
+  const k = wiz.k, b = wiz.brand, d = wiz.design, name = (b.name || '').trim();
+  if (!name) { toast('Give your company a name first'); return; }
+  const q = companyQuote(k, d, b);
+  if (player.gold < q.cost) { toast('Not enough gold'); return; }
+  player.gold -= q.cost; player.companies[k] = (player.companies[k] || 0) + 1; applyCompany(player, k, 1);
+  player.bonusIncome = (player.bonusIncome || 0) + COMPANIES[k].income * q.mods.income;
+  player.influence += q.mods.inf;
+  player.brands.push({ k, name, slogan: b.slogan, logo: { shape: b.shape, icon: b.icon, c1: b.c1, c2: b.c2 }, design: { ...d }, t: gt, income: q.income, inf: q.inf });
+  log(`🏢 You launched <b>${esc2(name)}</b> (${COMPANIES[k].name})`, '');
+  toast(`🏢 ${name} is open for business!`);
+  closeWizard(); updateUI(); dirtyPanel = true;
+  if (panelOpen) renderPanel();
+}
+wizEl.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-w]'); if (!el || !wiz) return;
+  const w = el.dataset.w, v = el.dataset.v, steps = wizSteps(wiz.k);
+  if (w === 'close') return closeWizard();
+  if (w === 'back') wiz.step = Math.max(0, wiz.step - 1);
+  else if (w === 'next') {
+    if (wiz.step === 0 && !wiz.brand.name.trim()) { toast('Give your company a name first'); return; }
+    wiz.step = Math.min(steps.length - 1, wiz.step + 1);
+  } else if (w === 'launch') return launchCompany();
+  else if (w === 'rand') wiz.brand.name = brandName(wiz.k);
+  else if (w === 'shape') wiz.brand.shape = v;
+  else if (w === 'icon') wiz.brand.icon = v;
+  else if (w === 'c1') wiz.brand.c1 = v;
+  else if (w === 'c2') wiz.brand.c2 = v;
+  else if (w.startsWith('dcolor:')) wiz.design[w.slice(7)] = v;
+  else if (w.startsWith('pick:')) wiz.design[w.slice(5)] = v;
+  wizRender();
+});
+wizEl.addEventListener('input', (e) => {
+  if (!wiz) return;
+  const t = e.target;
+  if (t.dataset.b) wiz.brand[t.dataset.b] = t.value;
+  else if (t.dataset.d) wiz.design[t.dataset.d] = t.value;
+  const pv = document.getElementById('wz-prev'); if (pv) pv.innerHTML = wizPreview();
+});
+// cards for the player's companies in the Companies tab
+function brandCards() {
+  if (!player.brands.length) return '';
+  return '<div class="sub"><b>Your companies</b></div>' + player.brands.map(b => `<div class="row brand"><div class="ic big">${logoSVG(b.logo ? { ...b.logo, name: b.name } : { shape: 'circle', icon: '', c1: '#334155', c2: '#fff', name: b.name }, 44)}</div><div class="grow"><b>${esc2(b.name)}</b> <span class="tag">${COMPANIES[b.k].name}</span><br><small>${esc2(designSummary(b.k, b.design))}<br>+${b.income.toFixed(1)}/s · +${b.inf}⭐</small></div></div>`).join('');
+}
+
+// ================= SAVE SLOTS =================
+// A save = the world seed (the map regenerates identically) + everything that changed since.
+// Stored in the viewer's private database (survives devices and browser clears) and in this browser as a backup.
+const BTYPES = ['house', 'lumber', 'market', 'tower'];
+const SLOT_IDS = ['s1', 's2', 's3', 's4', 's5'], AUTO = 'auto', AUTO2 = 'auto2';
+const slotName = s => s === AUTO ? 'Autosave' : s === AUTO2 ? 'Previous autosave' : 'Slot ' + s.slice(1);
+let gameEnded = false, blockAuto = false;
+
+function snapshot() {
+  const tiles = []; let cur = -1, run = 0;
+  for (const t of land) { if (t.country === cur) run++; else { if (run) tiles.push(cur, run); cur = t.country; run = 1; } }
+  tiles.push(cur, run);
+  const bld = []; for (const t of land) if (t.building) bld.push(t.i, BTYPES.indexOf(t.buildingType));
+  const r1 = x => Math.round(x * 10) / 10;
+  const cs = countries.map(c => ({
+    n: c.name, g: r1(c.gold), w: r1(c.wood), p: c.pop, pc: c.popCap, gr: r1(c.goldRate), wr: r1(c.woodRate), i: c.influence, d: c.dev,
+    u: [c.units.soldier, c.units.tank, c.units.ship, c.units.jet], co: c.companies, al: [...c.allies], cd: c.cool, f: c.favor,
+    x: c.dead ? 1 : 0, b: c.built, cap: c.capital ? c.capital.i : 0, bi: r1(c.bonusIncome || 0), br: c.brands || []
+  }));
+  const data = {
+    v: 1, seed: WORLD_SEED, player: player.id, gt, btc, tiles, bld, c: cs,
+    wars: wars.map(w => [w.a, w.b, w.start, w.initA, w.initB, w.lostA, w.lostB, w.stale, w.ticks, w.peaceCool]),
+    truce: [...truce.entries()], logs: logs.slice(0, 40).map(l => [l.t, l.msg, l.cls])
+  };
+  const alive = countries.filter(c => !c.dead).length;
+  return { data, meta: { seed: WORLD_SEED, nation: player.name, gt, tiles: player.tiles.length, gold: Math.floor(player.gold), power: Math.floor(power(player)), nations: alive, t: Date.now() } };
+}
+
+function applySave(S) {
+  if (S.player !== player.id) { toast('That save is from a different world version'); return false; }
+  gt = S.gt; btc = S.btc; btcPrev = S.btc;
+  for (const c of countries) c.tiles = [];
+  let li = 0;
+  for (let r = 0; r < S.tiles.length; r += 2) {
+    const cid = S.tiles[r], owner = countries[cid];
+    for (let n = 0; n < S.tiles[r + 1]; n++) {
+      const t = land[li++]; t.country = cid; owner.tiles.push(t);
+      t.color = t.terrain.clone().lerp(owner.color, 0.28).offsetHSL(0, 0, t.jit);
+      tileMesh.setColorAt(t.i, t.color);
+    }
+  }
+  tileMesh.instanceColor.needsUpdate = true;
+  for (let i = 0; i < S.bld.length; i += 2) placeBuilding(land[S.bld[i]], BTYPES[S.bld[i + 1]]);
+  S.c.forEach((o, id) => {
+    const c = countries[id];
+    c.name = o.n; c.gold = o.g; c.wood = o.w; c.pop = o.p; c.popCap = o.pc; c.goldRate = o.gr; c.woodRate = o.wr; c.influence = o.i; c.dev = o.d;
+    c.units = { soldier: o.u[0], tank: o.u[1], ship: o.u[2], jet: o.u[3] };
+    c.companies = o.co || {}; c.allies = new Set(o.al || []); c.cool = o.cd || {}; c.favor = o.f || 0; c.dead = !!o.x; c.built = o.b;
+    c.bonusIncome = o.bi || 0; c.brands = o.br || [];
+    c.capital = land[o.cap] || c.tiles[0] || c.capital;
+    if (c.tiles.length) {
+      c.tiles.sort((a, b) => ((a.px - c.capital.px) ** 2 + (a.pz - c.capital.pz) ** 2) - ((b.px - c.capital.px) ** 2 + (b.pz - c.capital.pz) ** 2));
+      c.sprite.position.set(c.capital.px, 3, c.capital.pz);
+    }
+    c.sprite.visible = !c.dead;
+    drawLabel(c);
+  });
+  wars.length = 0; truce.clear();
+  for (const a of S.wars) wars.push({ a: a[0], b: a[1], start: a[2], initA: a[3], initB: a[4], lostA: a[5], lostB: a[6], stale: a[7], ticks: a[8], peaceCool: a[9] });
+  for (const [k, v] of S.truce) truce.set(k, v);
+  logs.length = 0; for (const l of S.logs) logs.push({ t: l[0], msg: l[1], cls: l[2] });
+  nameInput.value = player.name;
+  dirtyMap = true; rebuildBorders(); drawMinimap(); dirtyMap = false;
+  goHome(); updateUI(); dirtyPanel = true;
+  return true;
+}
+
+// ---- compression + codes ----
+async function pack(obj) {
+  const json = JSON.stringify(obj);
+  try {
+    if (typeof CompressionStream !== 'undefined') {
+      const buf = new Uint8Array(await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+      let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+      return 'Z:' + btoa(bin);
+    }
+  } catch (e) {}
+  return 'J:' + json;
+}
+async function unpack(str) {
+  str = String(str).trim().replace(/^ISL1:/, '');
+  if (str.startsWith('J:')) return JSON.parse(str.slice(2));
+  if (str.startsWith('Z:')) {
+    const bin = atob(str.slice(2).replace(/\s+/g, '')), buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return JSON.parse(await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text());
+  }
+  throw new Error('not a save code');
+}
+
+// ---- storage: private database (if this viewer has one) + this browser ----
+const store = { db: null, uid: null, ready: false, local: false };
+try { localStorage.setItem('island_probe', '1'); localStorage.removeItem('island_probe'); store.local = true; } catch (e) {}
+const initStore = (async () => {
+  try {
+    if (typeof claude !== 'undefined' && claude && claude.use) {
+      const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+      const uid = user ? await user.id() : null;
+      if (db && uid) { store.db = db; store.uid = uid; }
+    }
+  } catch (e) {}
+  store.ready = true;
+})();
+const lsKey = s => 'island_slot_' + s;
+const slotDoc = s => store.db.collection('data/users/' + store.uid).doc('slot_' + s);
+async function putSlot(s, rec) {
+  let ok = false;
+  try { localStorage.setItem(lsKey(s), JSON.stringify(rec)); ok = true; } catch (e) {}
+  if (store.db) { try { await slotDoc(s).set(rec); ok = true; } catch (e) {} }
+  return ok;
+}
+async function getSlot(s) {
+  let best = null;
+  try { const raw = localStorage.getItem(lsKey(s)); if (raw) best = JSON.parse(raw); } catch (e) {}
+  if (store.db) { try { const d = await slotDoc(s).get(); if (d.exists) { const r = d.data(); if (r && r.meta && (!best || r.meta.t > best.meta.t)) best = r; } } catch (e) {} }
+  return best;
+}
+async function delSlot(s) {
+  try { localStorage.removeItem(lsKey(s)); } catch (e) {}
+  if (store.db) { try { await slotDoc(s).delete(); } catch (e) {} }
+}
+async function saveSlot(s, quiet) {
+  const snap = snapshot();
+  const ok = await putSlot(s, { meta: snap.meta, data: await pack(snap.data) });
+  if (!quiet) toast(ok ? `💾 Saved to ${slotName(s)}` : '⚠️ Could not store the save – use “Copy save code” instead');
+  return ok;
+}
+function bootInto(data) {
+  if (!bootStash(data)) { toast('This browser blocked reloading – use a save code instead'); return; }
+  toast('Loading…'); setTimeout(() => location.reload(), 150);
+}
+async function loadSlot(s) {
+  const rec = await getSlot(s); if (!rec) { toast('That slot is empty'); return; }
+  try { bootInto(await unpack(rec.data)); } catch (e) { toast('That save is damaged'); }
+}
+async function loadCode(text) {
+  try { const d = await unpack(text); if (!d || !d.seed || !d.c) throw 0; bootInto(d); } catch (e) { toast('That code is not a valid save'); }
+}
+
+// autosave: never overwrite an older game until the player has chosen what to do with it
+let autoStarted = false, lastAutoGt = -1;
+async function autosave() {
+  if (gameEnded || blockAuto || gt === lastAutoGt || gt < 5) return;
+  if (!autoStarted) {
+    autoStarted = true;
+    const prev = await getSlot(AUTO);
+    if (prev && prev.meta && prev.meta.seed !== WORLD_SEED) await putSlot(AUTO2, prev);     // keep the last session's autosave
+  }
+  lastAutoGt = gt;
+  await saveSlot(AUTO, true);
+}
+setInterval(autosave, 30000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(); });
+window.addEventListener('pagehide', () => { autosave(); });
+(async function offerContinue() {
+  if (BOOT) { lastAutoGt = -1; return; }
+  blockAuto = true;                       // until we know whether an older game is waiting
+  await initStore;
+  const a = await getSlot(AUTO);
+  if (!a || !a.meta || a.meta.seed === WORLD_SEED) { blockAuto = false; return; }
+  const m = a.meta;
+  const ask = () => popup(`<b>💾 Continue your last game?</b><br>${esc2(m.nation)} · ${m.tiles} tiles · 💰${fmt(m.gold)} · ⚔️${fmt(m.power)} · ${mmss(m.gt)} played`,
+    [{ label: '▶ Continue', fn: () => loadSlot(AUTO) }, { label: 'New world', fn: () => { blockAuto = false; } }], 1e9);
+  if (popupOpen) setTimeout(ask, 4000); else ask();
+})();
+
+// ---- the Saves tab ----
+const fmtDate = t => { try { return new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+let savesToken = 0, codeBox = '';
+async function renderSaves() {
+  const my = ++savesToken;
+  panelTitle.textContent = TAB_TITLES.saves;
+  if (!panelBody.dataset.saves) panelBody.innerHTML = '<div class="sub">Loading saves…</div>';
+  await initStore;
+  const recs = await Promise.all([...SLOT_IDS, AUTO, AUTO2].map(getSlot));
+  if (my !== savesToken || tab !== 'saves' || !panelOpen) return;
+  const where = store.db ? '☁️ Saves go to your private account storage and this browser.' : store.local ? '💾 Saves are kept in this browser only (they vanish if you clear site data) — use “Copy save code” for a backup.' : '⚠️ This browser blocks storage — use “Copy save code” to keep your progress.';
+  let h = `<div class="sub">${where}<br>Autosave runs every 30 s and is never overwritten by a brand-new world without asking.</div>`;
+  [...SLOT_IDS, AUTO, AUTO2].forEach((s, i) => {
+    const r = recs[i], m = r && r.meta, isSlot = SLOT_IDS.includes(s);
+    h += `<div class="row"><div class="grow"><b>${slotName(s)}</b>${m ? ` <span class="tag">${esc2(m.nation)}</span><br><small>${m.tiles} tiles · 💰${fmt(m.gold)} · ⚔️${fmt(m.power)} · ${m.nations} nations · ${mmss(m.gt)} played · ${fmtDate(m.t)}</small>` : '<br><small>Empty</small>'}</div>
+      <div class="sbtns">${isSlot ? btn('saveslot', '💾 Save', false, `data-s="${s}"`) : ''}${m ? btn('loadslot', '📂 Load', false, `data-s="${s}"`) : ''}${m && isSlot ? btn('delslot', '🗑️', false, `data-s="${s}"`) : ''}</div></div>`;
+  });
+  h += `<div class="sub"><b>Save code</b> — copy it somewhere safe, paste it here later to restore your game on any device.</div>
+    <div class="codebox"><textarea id="codebox" placeholder="Save code appears here, or paste one to load" spellcheck="false">${esc2(codeBox)}</textarea>
+    <div class="sbtns wide">${btn('exportcode', '📋 Make code')}${btn('copycode', 'Copy')}${btn('importcode', '📥 Load code')}</div></div>`;
+  panelBody.dataset.saves = '1';
+  const top = panelBody.scrollTop; panelBody.innerHTML = h; panelBody.scrollTop = top;
+}
+async function exportCode() {
+  const snap = snapshot(); codeBox = 'ISL1:' + await pack(snap.data);
+  const box = document.getElementById('codebox'); if (box) { box.value = codeBox; box.select(); }
+  toast('Save code ready – press Copy');
+}
+async function copyCode() {
+  const box = document.getElementById('codebox'); if (!box || !box.value) { toast('Make a code first'); return; }
+  box.select();
+  try { await navigator.clipboard.writeText(box.value); toast('📋 Copied!'); } catch (e) { toast('Press Ctrl/Cmd+C to copy the selected code'); }
+}
+
+// start-up: AI nations begin with a few buildings (a loaded save brings its own)
+if (!BOOT) for (const c of aiCountries) { const cap = Math.max(3, Math.round(c.tiles.length * 0.03)); for (let i = 0; i < Math.ceil(cap * 0.4); i++) aiPlaceBuilding(c, ['house', 'house', 'lumber', 'market', 'tower'][(rand() * 5) | 0]); }
+
+// Picking: march the camera ray through the tile grid (cheap even with 13k tiles)
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+function pickTile(e) {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const o = raycaster.ray.origin, d = raycaster.ray.direction;
+  if (d.y >= -0.001) return -1;
+  const top = 2, t0 = o.y > top ? (o.y - top) / -d.y : 0, t1 = (o.y + 0.2) / -d.y;
+  for (let t = t0; t < t1; t += 0.12) {
+    const px = o.x + d.x * t, py = o.y + d.y * t, pz = o.z + d.z * t;
+    const gx = Math.round((px + offX) / TILE_SIZE), gz = Math.round((pz + offZ) / TILE_SIZE);
+    if (gx < 0 || gz < 0 || gx >= MAP_W || gz >= MAP_H) continue;
+    const idx = cellIdx[gz * MAP_W + gx];
+    if (idx >= 0 && py <= land[idx].topY) return idx;
+  }
+  return -1;
+}
+
+const HOVER_OWN = new THREE.Color(0x7dd3fc), HOVER_FOREIGN = new THREE.Color(0xfca5a5);
+const tipEl = document.getElementById('tip'), toastEl = document.getElementById('toast');
+let hovered = -1, toastTimer = 0;
+const NAMES = { house: 'House', lumber: 'Lumber camp', market: 'Market', tower: 'Crystal tower' };
+function toast(msg) { toastEl.textContent = msg; toastEl.style.opacity = 1; clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.style.opacity = 0, 1800); }
+
+function updateHover(e) {
+  const next = pickTile(e);
+  if (next === hovered) return;
+  if (hovered >= 0) tileMesh.setColorAt(hovered, land[hovered].color);
+  if (next >= 0) {
+    const t = land[next];
+    tileMesh.setColorAt(next, t.country === player.id ? HOVER_OWN : HOVER_FOREIGN);
+    tipEl.textContent = countries[t.country].name + (t.buildingType ? ' · ' + NAMES[t.buildingType] : '') + (t.country === player.id ? ' (yours)' : '');
+  } else tipEl.textContent = '';
+  tileMesh.instanceColor.needsUpdate = true;
+  hovered = next;
+}
+window.addEventListener('pointermove', (e) => { if (e.target === renderer.domElement) updateHover(e); });
+
+// Build only on a click, not at the end of a drag
+let down = null;
+window.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, button: e.button, onCanvas: e.target === renderer.domElement }; });
+window.addEventListener('pointerup', (e) => {
+  const d = down; down = null;
+  if (!d || !d.onCanvas || d.button !== 0 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) return;
+  updateHover(e);
+  if (hovered < 0) return;
+  const tile = land[hovered];
+  if (tile.country !== player.id) { selectCountry(tile.country, true); return; }
+
+  if (state.selectedTool === 'demolish') {
+    if (tile.building) {
+      applyBuilding(player, tile.buildingType, -1);
+      scene.remove(tile.building);
+      tile.building = null; tile.buildingType = null;
+      rebuildCrystals();
+      updateUI();
+    }
+    return;
+  }
+
+  if (tile.building) return;
+  const cost = BUILDINGS[state.selectedTool];
+  if (state.gold >= cost.gold && state.wood >= cost.wood) {
+    state.gold -= cost.gold; state.wood -= cost.wood;
+    applyBuilding(player, state.selectedTool, 1);
+    placeBuilding(tile, state.selectedTool);
+    updateUI();
+  } else toast('Not enough gold or wood');
+});
+
+// Toolbar & UI
+document.querySelectorAll('.build-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.build-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.selectedTool = btn.dataset.type;
+  });
+});
+
+function updateUI() {
+  document.getElementById('gold-val').textContent = fmt(state.gold);
+  document.getElementById('wood-val').textContent = Math.floor(state.wood);
+  document.getElementById('pop-val').textContent = Math.floor(state.pop);
+  document.getElementById('pop-cap').textContent = `Cap: ${state.popCap}`;
+  document.getElementById('inf-val').textContent = state.influence;
+  const net = netIncome(state);
+  document.getElementById('gold-rate').textContent = `${net >= 0 ? '+' : ''}${net.toFixed(1)}/s`;
+  document.getElementById('mil-val').textContent = fmt(effPower(state));
+  document.getElementById('wood-rate').textContent = `+${state.woodRate}/s`;
+  const tier = state.influence >= 250 ? 'Metropolis Capital' : state.influence >= 150 ? 'City-State' : state.influence >= 75 ? 'Township' : state.influence >= 25 ? 'Hamlet' : 'Outpost';
+  document.getElementById('rank-badge').textContent = `Settlement: ${tier}`;
+}
+
+setInterval(gameTick, 1000);
+
+// Minimap (click or drag to jump)
+const mm = document.getElementById('minimap'), mmCanvas = document.getElementById('mm-canvas'), mmDot = document.getElementById('mm-dot');
+mmCanvas.width = MAP_W; mmCanvas.height = MAP_H;
+function drawMinimap() {
+  const g = mmCanvas.getContext('2d');
+  g.fillStyle = '#075985'; g.fillRect(0, 0, MAP_W, MAP_H);
+  for (const t of land) {
+    const c = countries[t.country].color;
+    g.fillStyle = t.country === player.id ? '#facc15' : `rgb(${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0})`;
+    g.fillRect(t.x, t.z, 1, 1);
+  }
+}
+drawMinimap();
+function moveTo(wx, wz) {
+  const nx = Math.max(-offX, Math.min(offX, wx)), nz = Math.max(-offZ, Math.min(offZ, wz));
+  const dx = nx - controls.target.x, dz = nz - controls.target.z;
+  controls.target.x += dx; controls.target.z += dz;
+  camera.position.x += dx; camera.position.z += dz;
+}
+function mmJump(e) {
+  const r = mm.getBoundingClientRect();
+  moveTo(((e.clientX - r.left) / r.width) * MAP_W * TILE_SIZE - offX - TILE_SIZE / 2, ((e.clientY - r.top) / r.height) * MAP_H * TILE_SIZE - offZ - TILE_SIZE / 2);
+}
+let mmDrag = false;
+mm.addEventListener('pointerdown', (e) => { mmDrag = true; mm.setPointerCapture(e.pointerId); mmJump(e); });
+mm.addEventListener('pointermove', (e) => { if (mmDrag) mmJump(e); });
+mm.addEventListener('pointerup', () => { mmDrag = false; });
+
+// Keyboard panning
+const keys = new Set();
+function goHome() {
+  controls.target.set(player.capital.px, 0.5, player.capital.pz);
+  camera.position.set(player.capital.px + 16, 18, player.capital.pz + 16);
+  controls.update();
+}
+document.getElementById('home-btn').addEventListener('click', goHome);
+window.addEventListener('keydown', (e) => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+  if (e.code === 'KeyH') { goHome(); return; }
+  keys.add(e.code);
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+const fwd = new THREE.Vector3(), right = new THREE.Vector3();
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1), t = clock.elapsedTime;
+  crystals.forEach((c, i) => {
+    c.rotation.y = t * 1.5;
+    c.position.y = 1.85 + Math.sin(t * 3 + i) * 0.08;
+  });
+  updateEffects(t);
+  updateBattles(t);
+
+  const dist = camera.position.distanceTo(controls.target);
+  if (keys.size) {
+    camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+    right.crossVectors(fwd, camera.up).normalize();
+    const s = dist * 0.9 * dt;
+    let mx = 0, mz = 0;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) { mx += fwd.x; mz += fwd.z; }
+    if (keys.has('KeyS') || keys.has('ArrowDown')) { mx -= fwd.x; mz -= fwd.z; }
+    if (keys.has('KeyD') || keys.has('ArrowRight')) { mx += right.x; mz += right.z; }
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) { mx -= right.x; mz -= right.z; }
+    moveTo(controls.target.x + mx * s, controls.target.z + mz * s);
+  }
+  controls.update();
+  // keep the view inside the world
+  const cx = Math.max(-offX, Math.min(offX, controls.target.x)), cz = Math.max(-offZ, Math.min(offZ, controls.target.z));
+  camera.position.x += cx - controls.target.x; camera.position.z += cz - controls.target.z;
+  controls.target.x = cx; controls.target.z = cz;
+
+  sun.position.set(controls.target.x + 60, 100, controls.target.z + 40);
+  sun.target.position.copy(controls.target);
+  const near = Math.max(0, Math.min(1, (dist - 22) / 25));
+  for (const c of countries) {
+    if (c.dead) { c.sprite.visible = false; continue; }
+    const o = near * Math.max(0, Math.min(1, (c.showUntil - dist) / 30));
+    c.sprite.material.opacity = o; c.sprite.visible = o > 0.01 && !c.dead;
+  }
+  const far = Math.max(0, Math.min(1, (dist - 230) / 70));
+  for (const c of continents) { c.sprite.material.opacity = far; c.sprite.visible = far > 0.01; }
+  mmDot.style.left = ((controls.target.x + offX) / (MAP_W * TILE_SIZE) * 100) + '%';
+  mmDot.style.top = ((controls.target.z + offZ) / (MAP_H * TILE_SIZE) * 100) + '%';
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+if (BOOT) applySave(BOOT);
+updateUI();
+animate();
+gameLive = true;
+setTab('nations'); setTab('nations'); // builds the panel once, leaves it closed
+
+</script>
+</body>
+</html>
