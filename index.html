@@ -1648,7 +1648,7 @@ function brandCards() {
 // ================= SETTINGS & FEEDBACK =================
 // Feedback goes to the game's GitHub Issues page (github.com/<owner>/<repo>/issues), where the game's maker reads it.
 const FEEDBACK_URL = 'https://github.com/Game-island-settlement/Island-Settlement/issues/new';
-let fbView = false, fbText = '', fbKind = 'Idea';
+let fbView = false, fbText = '', fbKind = 'Idea', fbLink = '';
 function renderSettings() {
   panelTitle.textContent = TAB_TITLES.settings;
   delete panelBody.dataset.saves; savesToken++;
@@ -1662,7 +1662,7 @@ function renderSettings() {
     h = `<div class="sub"><b>Send feedback</b><br>Pick a type, write your message, then press Send. It opens a form on GitHub (you need a free GitHub account to submit it there). Copy keeps the text so you can send it another way.</div>
       <div class="sbtns wide">${['Bug', 'Idea', 'Other'].map(k => `<button class="ab ${fbKind === k ? 'on' : ''}" data-act="fbkind" data-k="${k}" style="${fbKind === k ? 'border-color:#facc15;color:#fde047' : ''}">${k}</button>`).join('')}</div>
       <div class="codebox"><textarea id="fbbox" placeholder="Type your feedback here…" spellcheck="true" maxlength="2000">${esc2(fbText)}</textarea>
-      <div class="sbtns wide">${btn('fbsend', '📨 Send')}${btn('fbcopy', 'Copy')}${btn('fbback', '← Back')}</div></div>`;
+      <div class="sbtns wide">${btn('fbsend', '📨 Send')}${btn('fbcopy', 'Copy')}${btn('fbback', '← Back')}</div>${fbLink ? `<div class="sub">If nothing opened, tap this link: <a href="${esc2(fbLink)}" target="_blank" rel="noopener" style="color:#fde047;font-weight:700">Open the feedback form ↗</a></div>` : ''}</div>`;
   }
   panelBody.innerHTML = h;
 }
@@ -1674,8 +1674,11 @@ function sendFeedback() {
   const box = document.getElementById('fbbox'); if (box) fbText = box.value;
   if (!fbText.trim()) { toast('Type something first'); return; }
   const url = `${FEEDBACK_URL}?title=${encodeURIComponent('[' + fbKind + '] ' + fbText.trim().slice(0, 60))}&body=${encodeURIComponent(fbBody())}`;
-  window.open(url, '_blank', 'noopener');
+  fbLink = url;
+  const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'none';
+  document.body.appendChild(a); a.click(); a.remove();   // an anchor click works in iPad home-screen apps where window.open does nothing
   toast('Opening the feedback form…');
+  renderSettings();   // also shows a real tappable link underneath as a fallback
 }
 async function copyFeedback() {
   const box = document.getElementById('fbbox'); if (box) fbText = box.value;
