@@ -141,7 +141,7 @@
   <div class="stat"><b id="mil-val">0</b><small>Military</small></div>
 </div>
 <button id="home-btn" title="Fly back to your capital (H)">🏠 My country</button>
-<div id="menu"><button data-tab="companies">🏢 Companies</button><button data-tab="military">🪖 Military</button><button data-tab="nations">🌍 Nations</button><button data-tab="log">📰 News</button><button data-tab="saves">💾 Saves</button></div>
+<div id="menu"><button data-tab="companies">🏢 Companies</button><button data-tab="military">🪖 Military</button><button data-tab="nations">🌍 Nations</button><button data-tab="log">📰 News</button><button data-tab="saves">💾 Saves</button><button data-tab="settings">⚙️ Settings</button></div>
 <div id="panel" hidden><div id="panel-head"><b id="panel-title"></b><button id="panel-close">✕</button></div><div id="panel-body"></div></div>
 <div id="wizard" hidden></div>
 <div id="popup" hidden></div>
@@ -1197,14 +1197,14 @@ function gameTick() {
   if (gt % 5 === 0) allyRequestCheck();
   if (dirtyMap && gt % 2 === 0) { rebuildBorders(); drawMinimap(); dirtyMap = false; }
   updateUI();
-  if (panelOpen && tab !== 'saves' && (dirtyPanel || gt % 2 === 0)) renderPanel();
+  if (panelOpen && tab !== 'saves' && tab !== 'settings' && (dirtyPanel || gt % 2 === 0)) renderPanel();
 }
 
 // ================= UI: panels & popups =================
 const panelEl = document.getElementById('panel'), panelBody = document.getElementById('panel-body'), panelTitle = document.getElementById('panel-title');
 const popupEl = document.getElementById('popup');
 let panelOpen = false, tab = 'nations', selectedId = -1, sortKey = 'influence', sortDir = -1;
-const TAB_TITLES = { companies: '🏢 Companies', military: '🪖 Military', nations: '🌍 Nations', log: '📰 News', saves: '💾 Saves' };
+const TAB_TITLES = { companies: '🏢 Companies', military: '🪖 Military', nations: '🌍 Nations', log: '📰 News', saves: '💾 Saves', settings: '⚙️ Settings' };
 function setTab(t) {
   if (panelOpen && tab === t) { panelOpen = false; } else { tab = t; panelOpen = true; }
   panelEl.hidden = !panelOpen;
@@ -1229,6 +1229,7 @@ const btn = (act, label, disabled, data = '') => `<button class="ab" data-act="$
 function renderPanel() {
   dirtyPanel = false;
   if (tab === 'saves') { renderSaves(); return; }
+  if (tab === 'settings') { renderSettings(); return; }
   delete panelBody.dataset.saves;
   panelTitle.textContent = TAB_TITLES[tab];
   const top = panelBody.scrollTop;
@@ -1299,6 +1300,11 @@ panelBody.addEventListener('click', (e) => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
   const act = el.dataset.act, c = el.dataset.id !== undefined ? countries[+el.dataset.id] : null;
   if (act === 'found') { openWizard(el.dataset.k); return; }
+  else if (act === 'fbopen') { fbView = true; renderSettings(); return; }
+  else if (act === 'fbback') { fbView = false; renderSettings(); return; }
+  else if (act === 'fbsend') { sendFeedback(); return; }
+  else if (act === 'fbcopy') { copyFeedback(); return; }
+  else if (act === 'gohome') { goHome(); return; }
   else if (act === 'saveslot') { saveSlot(el.dataset.s).then(() => { if (tab === 'saves' && panelOpen) renderSaves(); }); return; }
   else if (act === 'loadslot') { const s = el.dataset.s; popup(`<b>📂 Load ${slotName(s)}?</b><br>Your current game is replaced (the autosave keeps the last 30 seconds).`, [{ label: 'Load', fn: () => loadSlot(s) }, { label: 'Cancel' }], 1e9); return; }
   else if (act === 'delslot') { const s = el.dataset.s; popup(`<b>🗑️ Delete ${slotName(s)}?</b>`, [{ label: 'Delete', fn: () => delSlot(s).then(() => { if (tab === 'saves' && panelOpen) renderSaves(); }) }, { label: 'Cancel' }], 1e9); return; }
@@ -1638,6 +1644,50 @@ function brandCards() {
   if (!player.brands.length) return '';
   return '<div class="sub"><b>Your companies</b></div>' + player.brands.map(b => `<div class="row brand"><div class="ic big">${logoSVG(b.logo ? { ...b.logo, name: b.name } : { shape: 'circle', icon: '', c1: '#334155', c2: '#fff', name: b.name }, 44)}</div><div class="grow"><b>${esc2(b.name)}</b> <span class="tag">${COMPANIES[b.k].name}</span><br><small>${esc2(designSummary(b.k, b.design))}<br>+${b.income.toFixed(1)}/s · +${b.inf}⭐</small></div></div>`).join('');
 }
+
+// ================= SETTINGS & FEEDBACK =================
+// Feedback goes to the game's GitHub Issues page (github.com/<owner>/<repo>/issues), where the game's maker reads it.
+const FEEDBACK_URL = 'https://github.com/Game-island-settlement/Island-Settlement/issues/new';
+let fbView = false, fbText = '', fbKind = 'Idea';
+function renderSettings() {
+  panelTitle.textContent = TAB_TITLES.settings;
+  delete panelBody.dataset.saves; savesToken++;
+  let h;
+  if (!fbView) {
+    h = `<div class="sub">Island Settlement · world seed ${WORLD_SEED}</div>
+      <div class="row"><div class="ic">📝</div><div class="grow"><b>Feedback</b><br><small>Report a bug or share an idea</small></div>${btn('fbopen', 'Open')}</div>
+      <div class="row"><div class="ic">🏠</div><div class="grow"><b>My country</b><br><small>Fly the camera back home (or press H)</small></div>${btn('gohome', 'Go')}</div>
+      <div class="sub">Tip: use the 💾 Saves tab to keep your progress.</div>`;
+  } else {
+    h = `<div class="sub"><b>Send feedback</b><br>Pick a type, write your message, then press Send. It opens a form on GitHub (you need a free GitHub account to submit it there). Copy keeps the text so you can send it another way.</div>
+      <div class="sbtns wide">${['Bug', 'Idea', 'Other'].map(k => `<button class="ab ${fbKind === k ? 'on' : ''}" data-act="fbkind" data-k="${k}" style="${fbKind === k ? 'border-color:#facc15;color:#fde047' : ''}">${k}</button>`).join('')}</div>
+      <div class="codebox"><textarea id="fbbox" placeholder="Type your feedback here…" spellcheck="true" maxlength="2000">${esc2(fbText)}</textarea>
+      <div class="sbtns wide">${btn('fbsend', '📨 Send')}${btn('fbcopy', 'Copy')}${btn('fbback', '← Back')}</div></div>`;
+  }
+  panelBody.innerHTML = h;
+}
+function fbBody() {
+  const box = document.getElementById('fbbox'); if (box) fbText = box.value;
+  return `${fbText}\n\n---\nNation: ${player.name} · tiles ${player.tiles.length} · gold ${Math.floor(player.gold)} · time ${mmss(gt)} · seed ${WORLD_SEED}\nBrowser: ${navigator.userAgent}`;
+}
+function sendFeedback() {
+  const box = document.getElementById('fbbox'); if (box) fbText = box.value;
+  if (!fbText.trim()) { toast('Type something first'); return; }
+  const url = `${FEEDBACK_URL}?title=${encodeURIComponent('[' + fbKind + '] ' + fbText.trim().slice(0, 60))}&body=${encodeURIComponent(fbBody())}`;
+  window.open(url, '_blank', 'noopener');
+  toast('Opening the feedback form…');
+}
+async function copyFeedback() {
+  const box = document.getElementById('fbbox'); if (box) fbText = box.value;
+  if (!fbText.trim()) { toast('Type something first'); return; }
+  try { await navigator.clipboard.writeText(fbBody()); toast('📋 Copied!'); } catch (e) { if (box) box.select(); toast('Press Ctrl/Cmd+C to copy'); }
+}
+panelBody.addEventListener('input', (e) => { if (e.target.id === 'fbbox') fbText = e.target.value; });
+panelBody.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act="fbkind"]'); if (!el) return;
+  const box = document.getElementById('fbbox'); if (box) fbText = box.value;
+  fbKind = el.dataset.k; renderSettings();
+});
 
 // ================= SAVE SLOTS =================
 // A save = the world seed (the map regenerates identically) + everything that changed since.
