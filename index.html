@@ -1657,6 +1657,7 @@ function brandCards() {
 // ================= SETTINGS & FEEDBACK =================
 // Feedback goes to the game's GitHub Issues page (github.com/<owner>/<repo>/issues), where the game's maker reads it.
 const FEEDBACK_URL = 'https://github.com/Game-island-settlement/Island-Settlement/issues/new';
+const REPO_URL = 'https://github.com/Game-island-settlement/Island-Settlement';
 let fbView = false, fbText = '', fbKind = 'Idea', fbLink = '';
 function renderSettings() {
   panelTitle.textContent = TAB_TITLES.settings;
@@ -1665,6 +1666,7 @@ function renderSettings() {
   if (!fbView) {
     h = `<div class="sub">Island Settlement · world seed ${WORLD_SEED}</div>
       <div class="row"><div class="ic">📝</div><div class="grow"><b>Feedback</b><br><small>Report a bug or share an idea</small></div>${btn('fbopen', 'Open')}</div>
+      <div class="row"><div class="ic">⭐</div><div class="grow"><b>Rate this game</b><br><small>Opens the game's GitHub page — tap the ⭐ Star button there</small></div><a class="ab" href="${REPO_URL}" target="_blank" rel="noopener" style="text-decoration:none">Open</a></div>
       <div class="row"><div class="ic">🏠</div><div class="grow"><b>My country</b><br><small>Fly the camera back home (or press H)</small></div>${btn('gohome', 'Go')}</div>
       <div class="sub">Tip: use the 💾 Saves tab to keep your progress.</div>`;
   } else {
