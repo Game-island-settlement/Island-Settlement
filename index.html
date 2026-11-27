@@ -98,6 +98,19 @@
     #home-btn{bottom:calc(var(--tb,64px) + 22px)}
     #hint{display:none}
   }
+  #home{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(2,132,199,.38);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+  #home[hidden]{display:none}
+  .hm-card{width:min(440px,94vw);max-height:92vh;overflow:auto;text-align:center;background:rgba(15,23,42,.74);border:1px solid rgba(125,211,252,.5);border-radius:18px;padding:22px 20px;box-shadow:0 12px 50px rgba(0,0,0,.5)}
+  .hm-card h1{margin:4px 0 6px;font-size:30px}.hm-card h2{margin:0 0 12px}.hm-logo{font-size:56px}
+  .hm-card p{color:#cbd5e1;font-size:14px;line-height:1.45;margin:6px 0}
+  .hm-b{display:block;width:100%;margin:10px 0;padding:14px;border-radius:12px;border:1px solid #38bdf8;background:rgba(14,116,144,.55);color:#fff;font:700 17px system-ui;cursor:pointer}
+  .hm-b small{display:block;font-weight:400;font-size:12px;color:#bae6fd;margin-top:3px}
+  .hm-b.big{font-size:22px;padding:18px;background:#0284c7}
+  .hm-b.ghost{background:transparent;border-color:#475569;font-size:14px;padding:9px;font-weight:600}
+  .hm-b:disabled{opacity:.5}
+  .hm-card textarea{width:100%;height:96px;box-sizing:border-box;background:#0b1224;color:#cbd5e1;border:1px solid #475569;border-radius:8px;font:11px monospace;padding:6px;margin:6px 0}
+  .hm-status{min-height:18px;color:#fde047;font-size:13px;margin:6px 0}
+  .hm-note{font-size:12px!important;color:#94a3b8!important}
 </style>
 <script>
 // Loader: pick a CDN that works, register the import map, then start the game module (so exported/offline-opened copies fail loudly instead of showing a blank blue screen)
@@ -152,6 +165,7 @@
 <div id="menu"><button data-tab="companies">🏢 Companies</button><button data-tab="military">🪖 Military</button><button data-tab="nations">🌍 Nations</button><button data-tab="log">📰 News</button><button data-tab="saves">💾 Saves</button><button data-tab="settings">⚙️ Settings</button></div></div>
 <div id="panel" hidden><div id="panel-head"><b id="panel-title"></b><button id="panel-close">✕</button></div><div id="panel-body"></div></div>
 <div id="wizard" hidden></div>
+<div id="home"></div>
 <div id="popup" hidden></div>
 <div id="tip"></div><div id="toast"></div>
 <div id="minimap"><canvas id="mm-canvas"></canvas><div id="mm-dot"></div></div>
@@ -419,6 +433,10 @@ function bootStash(save) {
 }
 window.__gameUp = true;
 const BOOT = bootTake();
+// multiplayer state (peer-to-peer: no server; the host's browser runs the world, the guest sends commands and mirrors the result)
+const MP = { role: BOOT && BOOT.mp ? BOOT.mp.role : null, open: false, pc: null, dc: null, synced: false };
+let gameStarted = false, startResolve; const startedP = new Promise(r => { startResolve = r; });
+let toastRoute = null;
 const WORLD_SEED = BOOT ? BOOT.seed : (Math.random() * 1e9) | 0;
 const rand = mulberry32(WORLD_SEED);
 const world = generateWorld(MAP_W, MAP_H, rand);
@@ -473,7 +491,11 @@ for (const c of countries) {
 }
 const candidates = countries.filter(c => c.tiles.length >= 150);
 const pool = candidates.length ? candidates : countries;
-const player = pool.reduce((a, b) => Math.abs(b.tiles.length - 300) < Math.abs(a.tiles.length - 300) ? b : a);
+const byClose = [...pool].sort((a, b) => Math.abs(a.tiles.length - 300) - Math.abs(b.tiles.length - 300));
+const P1 = byClose[0], P2 = byClose[1] || countries.find(c => c !== P1);   // host/solo player and (in multiplayer) the second player; both sides compute the same two
+let player = (MP.role === 'guest') ? P2 : P1;
+const isHuman = c => c === P1 || (MP.open && c === P2);
+const netGuest = () => MP.role === 'guest';
 const PLAYER_GOLD = new THREE.Color(0xfacc15);
 Object.assign(player, state); state = player; // the player's nation shares the same data model as every bot
 const wars = [];
@@ -590,7 +612,7 @@ continents.forEach((c, k) => makeLabel(c, true, conts[k].cx * TILE_SIZE - offX, 
 // Player nation name box
 const nameInput = document.getElementById('nation-name');
 nameInput.value = player.name;
-nameInput.addEventListener('input', () => { player.name = nameInput.value.trim() || 'Nameless Land'; drawLabel(player); });
+nameInput.addEventListener('input', () => { const nm = nameInput.value.trim() || 'Nameless Land'; player.name = nm; drawLabel(player); if (netGuest()) netCmd({ c: 'rename', name: nm }); });
 
 // Camera starts over the player's capital
 controls.target.set(player.capital.px, 0.5, player.capital.pz);
@@ -1007,6 +1029,7 @@ function fight(w) {
   const ratio = (ea + 1) / (eb + 1);
   let winner = ratio > 1.15 ? A : ratio < 1 / 1.15 ? B : null;
   if (gameLive) spawnBattle(w, A, B, lossA, lossB, winner === A ? 'A' : winner === B ? 'B' : null);
+  if (MP.open && MP.role === 'host') netSend({ t: 'fx', a: w.a, b: w.b, la: lossA, lb: lossB, win: winner === A ? 'A' : winner === B ? 'B' : null });
   if (winner) {
     const loser = winner === A ? B : A, big = Math.max(ratio, 1 / ratio) > 2.5;
     const got = conquer(winner, loser, 1 + Math.floor(Math.random() * 2) + (big ? 2 : 0));
@@ -1022,6 +1045,7 @@ function fight(w) {
 // ---- player diplomacy (acceptance is a roll: alliances ~45%, money ~20%, land ~14%, peace 20-75%) ----
 const cdLeft = (c, k) => Math.ceil(Math.max(0, (c.cool[k] || 0) - gt));
 function proposeAlliance(c) {
+  if (viaNet('ally', c)) return;
   if (cdLeft(c, 'ally') || atWar(c) || player.allies.has(c.id)) return;
   if (player.allies.size >= 5 || c.allies.size >= 5) { toast('Alliance limit reached (5)'); return; }
   const p = 0.45 + Math.max(-0.1, Math.min(0.1, (player.influence - c.influence) / 300)) + c.favor * 0.01;
@@ -1031,10 +1055,12 @@ function proposeAlliance(c) {
   } else { c.cool.ally = gt + 25; c.favor -= 0.5; toast(`${c.name} refused the alliance`); }
 }
 function breakAlliance(c) {
+  if (viaNet('unally', c)) return;
   player.allies.delete(c.id); c.allies.delete(player.id); c.favor -= 4;
   log(`💔 You ended the alliance with ${c.name}`, ''); toast('Alliance ended');
 }
 function askMoney(c) {
+  if (viaNet('money', c)) return;
   if (cdLeft(c, 'money') || atWar(c)) return;
   const p = (player.allies.has(c.id) ? 0.35 : 0.2) + c.favor * 0.005, amount = Math.round(Math.max(20, c.gold * 0.12));
   if (c.gold >= 30 && Math.random() < p) {
@@ -1043,6 +1069,7 @@ function askMoney(c) {
   } else { c.cool.money = gt + 25; toast(`${c.name} said no`); }
 }
 function askLand(c) {
+  if (viaNet('land', c)) return;
   if (cdLeft(c, 'land') || atWar(c)) return;
   if (c.tiles.length < 15) { toast(`${c.name} is too small to give land`); return; }
   const cand = borderTiles(c, player, false);
@@ -1068,9 +1095,16 @@ function playerDeclareWar(c) {
   if (warBetween(player.id, c.id)) return;
   if (truceLeft(player.id, c.id)) { toast(`Truce with ${c.name}: ${truceLeft(player.id, c.id)}s left`); return; }
   popup(`<b>⚔️ Declare war on ${esc(c.name)}?</b>${oddsHTML(c)}<small>Both sides can buy units during a war and allies lend 35% of their army, so check the numbers.</small>`,
-    [{ label: '⚔️ Declare war', fn: () => { if (!warBetween(player.id, c.id)) { declareWar(player.id, c.id); toast(`⚔️ War on ${c.name}!`); } } }, { label: 'Cancel' }], 1e9);
+    [{ label: '⚔️ Declare war', fn: () => { if (netGuest()) netCmd({ c: 'war', id: c.id }); else doDeclareWar(c); } }, { label: 'Cancel' }], 1e9);
+}
+function doDeclareWar(c) {
+  if (player.allies.has(c.id)) { toast('Break the alliance first'); return; }
+  if (warBetween(player.id, c.id)) return;
+  if (truceLeft(player.id, c.id)) { toast(`Truce with ${c.name}: ${truceLeft(player.id, c.id)}s left`); return; }
+  declareWar(player.id, c.id); toast(`⚔️ War on ${c.name}!`);
 }
 function askPeace(w) {
+  if (viaNet('peace', countries[w.a === player.id ? w.b : w.a])) return;
   if (w.peaceCool > gt) { toast(`They won't talk yet (${Math.ceil(w.peaceCool - gt)}s)`); return; }
   const enemy = countries[w.a === player.id ? w.b : w.a], r = (effPower(enemy) + 1) / (effPower(player) + 1);
   const p = r > 1.2 ? 0.2 : r < 0.83 ? 0.75 : 0.5;
@@ -1079,6 +1113,7 @@ function askPeace(w) {
 
 // ---- player purchases ----
 function buyUnit(k, n) {
+  if (netGuest()) { netCmd({ c: 'buyunit', k, n }); return; }
   const cost = unitCost(player, k) * n;
   if (player.gold < cost) { toast('Not enough gold'); return; }
   player.gold -= cost; player.units[k] += n; updateUI(); dirtyPanel = true;
@@ -1155,16 +1190,17 @@ function aiDiplomacy() {
     if (a.dead || atWar(a)) continue;
     const b = neighbourOf(a);
     if (!b || b.dead || a.allies.has(b.id) || truceLeft(a.id, b.id) || warBetween(a.id, b.id)) continue;
-    if (b === player && (gt < 180 || wars.filter(w => w.a === player.id || w.b === player.id).length >= 2)) continue;
-    if (wars.length < 12 && power(a) > 6 && power(a) > effPower(b) * (b === player ? 2.5 : 2) + 3 && Math.random() < 0.25) {
+    if (isHuman(b) && (gt < 180 || wars.filter(w => w.a === b.id || w.b === b.id).length >= 2)) continue;
+    if (wars.length < 12 && power(a) > 6 && power(a) > effPower(b) * (isHuman(b) ? 2.5 : 2) + 3 && Math.random() < 0.25) {
       declareWar(a.id, b.id);
-      if (b === player) popup(`<b>⚔️ ${a.name} declared war on you!</b><br>Their power: ${fmt(power(a))} · yours: ${fmt(power(player))}.<br>Buy units in the Military tab or ask for peace.`, [{ label: 'OK' }], 20000);
+      if (MP.open && b === P2) netSend({ t: 'info', html: `<b>⚔️ ${esc(a.name)} declared war on you!</b><br>Their power: ${fmt(power(a))} · yours: ${fmt(power(b))}.<br>Buy units in the Military tab or ask for peace.` });
+      else if (b === player) popup(`<b>⚔️ ${a.name} declared war on you!</b><br>Their power: ${fmt(power(a))} · yours: ${fmt(power(player))}.<br>Buy units in the Military tab or ask for peace.`, [{ label: 'OK' }], 20000);
     }
   }
   // alliances between neighbours
   for (let n = 0; n < 3; n++) {
     const a = list[(Math.random() * list.length) | 0], b = a && neighbourOf(a);
-    if (!b || b === player || b.dead || atWar(a) || atWar(b) || a.allies.has(b.id) || a.allies.size >= 4 || b.allies.size >= 4) continue;
+    if (!b || isHuman(b) || b.dead || atWar(a) || atWar(b) || a.allies.has(b.id) || a.allies.size >= 4 || b.allies.size >= 4) continue;
     if (Math.random() < 0.15) { a.allies.add(b.id); b.allies.add(a.id); if (Math.random() < 0.3) log(`🤝 ${a.name} and ${b.name} formed an alliance`, 'peace'); }
   }
 }
@@ -1190,6 +1226,8 @@ function allyRequestCheck() {
 
 // ---- tick ----
 function gameTick() {
+  if (!gameStarted) return;
+  if (MP.role === 'guest') { guestTick(); return; }
   gt++;
   if (gt % 2 === 0) layout();
   btcPrev = btc; btc = Math.max(0.25, Math.min(3.5, btc * Math.exp((Math.random() - 0.5) * 0.14) + (1 - btc) * 0.01));
@@ -1197,7 +1235,7 @@ function gameTick() {
     if (c.dead) continue;
     c.gold += netIncome(c);
     if (c.gold < 0) { c.gold = 0; c.units.soldier = Math.max(0, c.units.soldier - 1); }
-    c.wood += c.woodRate + (c === player ? 0 : 1);
+    c.wood += c.woodRate + (isHuman(c) ? 0 : 1);
     if (c.pop < c.popCap) c.pop = Math.min(c.popCap, c.pop + 1);
   }
   if (gt % 2 === 0) for (const w of wars.slice()) fight(w);
@@ -1205,6 +1243,7 @@ function gameTick() {
   if (gt % 6 === 0) aiDiplomacy();
   if (gt % 5 === 0) allyRequestCheck();
   if (dirtyMap && gt % 2 === 0) { rebuildBorders(); drawMinimap(); dirtyMap = false; }
+  if (MP.open && gt % 2 === 0) sendSnapshot();
   updateUI();
   if (panelOpen && tab !== 'saves' && tab !== 'settings' && (dirtyPanel || gt % 2 === 0)) renderPanel();
 }
@@ -1270,7 +1309,7 @@ function renderPanel() {
   } else {
     const sel = selectedId >= 0 ? countries[selectedId] : null;
     if (sel && !sel.dead) h += nationCard(sel);
-    const rows = alive().concat([player]).filter(c => !c.dead);
+    const rows = countries.filter(c => !c.dead);
     const val = { name: c => c.name, gold: c => c.gold, power: c => effPower(c), influence: c => c.influence, pop: c => c.pop }[sortKey];
     rows.sort((a, b) => sortKey === 'name' ? sortDir * a.name.localeCompare(b.name) : sortDir * (val(a) - val(b)));
     const th = (k, l) => `<th data-act="sort" data-k="${k}">${l}${sortKey === k ? (sortDir < 0 ? ' ▼' : ' ▲') : ''}</th>`;
@@ -1609,17 +1648,26 @@ function wizRender() {
     <div class="wz-grid"><div class="wz-form">${body}</div><div class="wz-prev" id="wz-prev">${wizPreview()}</div></div>
     <div class="wz-foot"><button data-w="back" ${wiz.step === 0 ? 'disabled' : ''}>← Back</button>${last ? `<button class="go" data-w="launch">🚀 Launch for 💰${fmt(companyQuote(wiz.k, d, b).cost)}</button>` : '<button class="go" data-w="next">Next →</button>'}</div></div>`;
 }
-function launchCompany() {
-  const k = wiz.k, b = wiz.brand, d = wiz.design, name = (b.name || '').trim();
-  if (!name) { toast('Give your company a name first'); return; }
-  const q = companyQuote(k, d, b);
-  if (player.gold < q.cost) { toast('Not enough gold'); return; }
+function foundCompany(k, b, d) {
+  const name = (b.name || '').trim(), q = companyQuote(k, d, b);
+  if (!name) { toast('Give your company a name first'); return false; }
+  if (player.gold < q.cost) { toast('Not enough gold'); return false; }
   player.gold -= q.cost; player.companies[k] = (player.companies[k] || 0) + 1; applyCompany(player, k, 1);
   player.bonusIncome = (player.bonusIncome || 0) + COMPANIES[k].income * q.mods.income;
   player.influence += q.mods.inf;
   player.brands.push({ k, name, slogan: b.slogan, logo: { shape: b.shape, icon: b.icon, c1: b.c1, c2: b.c2 }, design: { ...d }, t: gt, income: q.income, inf: q.inf });
-  log(`🏢 You launched <b>${esc2(name)}</b> (${COMPANIES[k].name})`, '');
+  log(`🏢 ${esc2(player.name)} launched <b>${esc2(name)}</b> (${COMPANIES[k].name})`, '');
   toast(`🏢 ${name} is open for business!`);
+  return true;
+}
+function launchCompany() {
+  const k = wiz.k, b = wiz.brand, d = wiz.design;
+  if (!(b.name || '').trim()) { toast('Give your company a name first'); return; }
+  if (netGuest()) {
+    if (player.gold < companyQuote(k, d, b).cost) { toast('Not enough gold'); return; }
+    netCmd({ c: 'found', k, brand: b, design: d }); closeWizard(); return;
+  }
+  if (!foundCompany(k, b, d)) return;
   closeWizard(); updateUI(); dirtyPanel = true;
   if (panelOpen) renderPanel();
 }
@@ -1858,9 +1906,10 @@ setInterval(autosave, 30000);
 document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(); });
 window.addEventListener('pagehide', () => { autosave(); });
 (async function offerContinue() {
-  if (BOOT) { lastAutoGt = -1; return; }
+  if (BOOT) { lastAutoGt = -1; if (MP.role) blockAuto = true; return; }
   blockAuto = true;                       // until we know whether an older game is waiting
   await initStore;
+  if ((await startedP) !== 'single') return;   // multiplayer worlds are not autosaved (yet)
   const a = await getSlot(AUTO);
   if (!a || !a.meta || a.meta.seed === WORLD_SEED) { blockAuto = false; return; }
   const m = a.meta;
@@ -1903,6 +1952,257 @@ async function copyCode() {
   try { await navigator.clipboard.writeText(box.value); toast('📋 Copied!'); } catch (e) { toast('Press Ctrl/Cmd+C to copy the selected code'); }
 }
 
+// ================= MULTIPLAYER (peer-to-peer, no server) =================
+// Host = the browser that runs the world. Guest = a second human who controls another country: it sends commands and mirrors the host's snapshots.
+const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+function viaNet(cmd, c) {     // true = the action was handled here (blocked, or forwarded to the host)
+  if (c && isHuman(c) && cmd !== 'peace') { toast('Players can’t do that to each other yet'); return true; }
+  if (netGuest()) { netCmd({ c: cmd, id: c ? c.id : undefined }); return true; }
+  return false;
+}
+function netCmd(o) { if (!MP.open) { toast('Not connected to the host'); return; } netSend(Object.assign({ t: 'cmd' }, o)); }
+function tryBuild(tile, type) {
+  if (tile.country !== player.id) return;
+  if (type === 'demolish') {
+    if (tile.building) { applyBuilding(player, tile.buildingType, -1); scene.remove(tile.building); tile.building = null; tile.buildingType = null; rebuildCrystals(); updateUI(); }
+    return;
+  }
+  if (tile.building || !BUILDINGS[type]) return;
+  const cost = BUILDINGS[type];
+  if (player.gold >= cost.gold && player.wood >= cost.wood) {
+    player.gold -= cost.gold; player.wood -= cost.wood;
+    applyBuilding(player, type, 1); placeBuilding(tile, type); updateUI();
+  } else toast('Not enough gold or wood');
+}
+// the host turns the second country from a bot into a human player when the guest connects
+function makeHuman(c) {
+  for (const t of c.tiles) if (t.building) { applyBuilding(c, t.buildingType, -1); scene.remove(t.building); t.building = null; t.buildingType = null; }
+  rebuildCrystals();
+  Object.assign(c, { gold: 300, wood: 100, pop: 10, popCap: 10, influence: 0, goldRate: 0, woodRate: 0, dev: 0, built: 0, favor: 0, selectedTool: 'house' });
+  c.units = { soldier: 10, tank: 0, ship: 0, jet: 0 }; c.companies = {}; c.brands = []; c.bonusIncome = 0; c.allies = new Set(); c.cool = {};
+  for (const o of countries) o.allies.delete(c.id);
+  for (const w of wars.filter(w => w.a === c.id || w.b === c.id)) wars.splice(wars.indexOf(w), 1);
+  const i = aiCountries.indexOf(c); if (i >= 0) aiCountries.splice(i, 1);
+  dirtyMap = true;
+}
+
+// ---- messages (JSON over a WebRTC data channel, big ones split into pieces) ----
+let msgId = 0; const inbox = new Map();
+function netSend(o) {
+  const dc = MP.dc; if (!dc || dc.readyState !== 'open') return false;
+  if (o.t === 'snap' && dc.bufferedAmount > 400000) return false;
+  const str = JSON.stringify(o), SZ = 12000;
+  if (str.length < SZ) { dc.send('M' + str); return true; }
+  const id = ++msgId, n = Math.ceil(str.length / SZ);
+  for (let i = 0; i < n; i++) dc.send('C' + id + '|' + i + '|' + n + '|' + str.slice(i * SZ, (i + 1) * SZ));
+  return true;
+}
+function netRecv(ev) {
+  const d = ev.data; if (typeof d !== 'string') return;
+  try {
+    if (d[0] === 'M') { netHandle(JSON.parse(d.slice(1))); return; }
+    if (d[0] === 'C') {
+      const p = d.indexOf('|'), q = d.indexOf('|', p + 1), r = d.indexOf('|', q + 1);
+      const id = d.slice(1, p), i = +d.slice(p + 1, q), n = +d.slice(q + 1, r);
+      let e = inbox.get(id); if (!e) { e = { n, parts: [], got: 0 }; inbox.set(id, e); }
+      if (e.parts[i] === undefined) { e.parts[i] = d.slice(r + 1); e.got++; }
+      if (e.got === e.n) { inbox.delete(id); netHandle(JSON.parse(e.parts.join(''))); }
+    }
+  } catch (err) { console.error('net', err); }
+}
+let latestSnap = null, snapBusy = false, hostSnapBusy = false;
+function netHandle(m) {
+  if (m.t === 'snap' && netGuest()) { latestSnap = m.d; if (!snapBusy) drainSnap(); }
+  else if (m.t === 'cmd' && MP.role === 'host') hostCmd(m);
+  else if (m.t === 'toast') toast(m.m);
+  else if (m.t === 'info') popup(m.html, [{ label: 'OK' }], 20000);
+  else if (m.t === 'fx' && netGuest() && gameLive) {
+    const A = countries[m.a], B = countries[m.b]; if (A && B) spawnBattle(warBetween(m.a, m.b) || { a: m.a, b: m.b }, A, B, m.la, m.lb, m.win);
+  }
+}
+async function sendSnapshot() {
+  if (!MP.open || MP.role !== 'host' || hostSnapBusy) return;
+  hostSnapBusy = true;
+  try { netSend({ t: 'snap', d: await pack(snapshot().data) }); } catch (e) { console.error(e); }
+  hostSnapBusy = false;
+}
+async function drainSnap() {
+  snapBusy = true;
+  try {
+    while (latestSnap) { const d = latestSnap; latestSnap = null; mirrorApply(await unpack(d)); }
+  } catch (e) { console.error('snap', e); }
+  snapBusy = false;
+}
+
+// ---- host: run a guest's command as if the guest were `player` ----
+function hostCmd(m) {
+  const G = P2; if (!G || G.dead) return;
+  const run = (fn) => {
+    const sp = player; player = G; state = G; toastRoute = (s) => netSend({ t: 'toast', m: s });
+    try { fn(); } catch (e) { console.error('cmd', e); } finally { player = sp; state = sp; toastRoute = null; }
+  };
+  const T = m.id !== undefined ? countries[m.id] : null;
+  switch (m.c) {
+    case 'build': { const t = land[m.i]; if (t && typeof m.type === 'string') run(() => tryBuild(t, m.type)); break; }
+    case 'buyunit': if (UNITS[m.k] && m.n > 0 && m.n <= 100) run(() => buyUnit(m.k, m.n | 0)); break;
+    case 'found': if (COMPANIES[m.k] && m.brand && m.design) run(() => foundCompany(m.k, { name: String(m.brand.name || '').slice(0, 24), slogan: String(m.brand.slogan || '').slice(0, 40), shape: m.brand.shape, icon: m.brand.icon, c1: m.brand.c1, c2: m.brand.c2 }, m.design)); break;
+    case 'war': if (T && !T.dead && T !== G) run(() => doDeclareWar(T)); break;
+    case 'peace': if (T) run(() => { const w = warBetween(G.id, T.id); if (w) askPeace(w); }); break;
+    case 'ally': if (T && !T.dead) run(() => proposeAlliance(T)); break;
+    case 'unally': if (T) run(() => breakAlliance(T)); break;
+    case 'money': if (T && !T.dead) run(() => askMoney(T)); break;
+    case 'land': if (T && !T.dead) run(() => askLand(T)); break;
+    case 'rename': G.name = String(m.name || '').slice(0, 22) || 'Nameless Land'; drawLabel(G); break;
+  }
+  setTimeout(sendSnapshot, 150);
+}
+
+// ---- guest: mirror the host's world ----
+let lblNames = {};
+function applyMirror(S) {
+  gt = S.gt; btc = S.btc; btcPrev = S.btc;
+  const per = countries.map(() => []), changed = []; let li = 0;
+  for (let r = 0; r < S.tiles.length; r += 2) {
+    const cid = S.tiles[r], owner = countries[cid];
+    for (let n = 0; n < S.tiles[r + 1]; n++) {
+      const t = land[li++]; per[cid].push(t);
+      if (t.country !== cid) { t.country = cid; t.color = t.terrain.clone().lerp(owner.color, 0.28).offsetHSL(0, 0, t.jit); tileMesh.setColorAt(t.i, t.color); changed.push(t); }
+    }
+  }
+  countries.forEach((c, id) => { c.tiles = per[id]; });
+  if (changed.length) { tileMesh.instanceColor.needsUpdate = true; if (gameLive) for (const t of changed.slice(0, 3)) spawnCapture(t, countries[t.country]); }
+  const want = new Map(); for (let i = 0; i < S.bld.length; i += 2) want.set(S.bld[i], BTYPES[S.bld[i + 1]]);
+  let rmTower = false;
+  for (const t of land) if (t.building && want.get(t.i) !== t.buildingType) { if (t.buildingType === 'tower') rmTower = true; scene.remove(t.building); t.building = null; t.buildingType = null; }
+  if (rmTower) rebuildCrystals();
+  for (const [i, type] of want) { const t = land[i]; if (!t.building) placeBuilding(t, type); }
+  S.c.forEach((o, id) => {
+    const c = countries[id];
+    if (c.name !== o.n) { c.name = o.n; drawLabel(c); }
+    c.gold = o.g; c.wood = o.w; c.pop = o.p; c.popCap = o.pc; c.goldRate = o.gr; c.woodRate = o.wr; c.influence = o.i; c.dev = o.d;
+    c.units = { soldier: o.u[0], tank: o.u[1], ship: o.u[2], jet: o.u[3] };
+    c.companies = o.co || {}; c.allies = new Set(o.al || []); c.cool = o.cd || {}; c.favor = o.f || 0; c.dead = !!o.x; c.built = o.b;
+    c.bonusIncome = o.bi || 0; c.brands = o.br || [];
+    const cap = land[o.cap]; if (cap && cap !== c.capital) { c.capital = cap; c.sprite.position.set(cap.px, 3, cap.pz); }
+    c.sprite.visible = !c.dead;
+  });
+  const sig = JSON.stringify(S.wars.map(w => w[0] + '-' + w[1]));
+  const warsChanged = sig !== applyMirror.sig; applyMirror.sig = sig;
+  wars.length = 0; truce.clear();
+  for (const a of S.wars) wars.push({ a: a[0], b: a[1], start: a[2], initA: a[3], initB: a[4], lostA: a[5], lostB: a[6], stale: a[7], ticks: a[8], peaceCool: a[9] });
+  for (const [k, v] of S.truce) truce.set(k, v);
+  logs.length = 0; for (const l of S.logs) logs.push({ t: l[0], msg: l[1], cls: l[2] });
+  if (document.activeElement !== nameInput) nameInput.value = player.name;
+  if (changed.length || warsChanged) { rebuildBorders(); drawMinimap(); }
+  dirtyPanel = true;
+  if (player.dead && !gameEnded) gameOver();
+}
+function mirrorApply(S) {
+  const first = !MP.synced, live = gameLive;
+  if (first) gameLive = false;                 // do not play "construction" effects for the whole world at once
+  try { applyMirror(S); } finally { gameLive = live; }
+  updateUI();
+  if (first) {
+    MP.synced = true; gameStarted = true; homeEl.hidden = true; startResolve('mp'); goHome();
+    toast('🤝 Connected! You control ' + player.name);
+  }
+}
+let guestN = 0;
+function guestTick() {
+  guestN++; updateUI(); layout();
+  if (panelOpen && tab !== 'saves' && tab !== 'settings' && (dirtyPanel || guestN % 2 === 0)) renderPanel();
+}
+
+// ---- connecting (codes are copied between the two devices) ----
+const waitIce = (pc) => new Promise((res) => {
+  if (pc.iceGatheringState === 'complete') return res();
+  const t = setTimeout(res, 6000);
+  pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } });
+});
+function wireChannel(dc) {
+  MP.dc = dc; dc.onmessage = netRecv;
+  dc.onopen = () => {
+    MP.open = true;
+    if (MP.role === 'host') {
+      makeHuman(P2); gameStarted = true; homeEl.hidden = true; blockAuto = true; startResolve('mp');
+      toast('🤝 Player 2 connected!'); sendSnapshot();
+    } else setStatus('Connected! Loading the world…');
+  };
+  dc.onclose = () => {
+    if (!MP.open) return; MP.open = false;
+    popup('<b>🔌 Connection lost</b><br>The other player disconnected.', [{ label: 'OK' }], 1e9);
+  };
+}
+async function hostCreate() {
+  MP.role = 'host'; blockAuto = true;
+  const pc = MP.pc = new RTCPeerConnection(ICE);
+  wireChannel(pc.createDataChannel('game'));
+  await pc.setLocalDescription(await pc.createOffer()); await waitIce(pc);
+  return 'IMH1:' + await pack({ seed: WORLD_SEED, sdp: pc.localDescription.sdp });
+}
+async function hostAccept(code) {
+  const o = await unpack(String(code).trim().replace(/^IMG1:/, ''));
+  if (!o || !o.sdp) throw new Error('bad code');
+  await MP.pc.setRemoteDescription({ type: 'answer', sdp: o.sdp });
+}
+async function guestStart(hostCode) {
+  try {
+    const o = await unpack(String(hostCode).trim().replace(/^IMH1:/, ''));
+    if (!o || !o.sdp) throw new Error('bad code');
+    MP.role = 'guest'; blockAuto = true;
+    const pc = MP.pc = new RTCPeerConnection(ICE);
+    pc.ondatachannel = (e) => wireChannel(e.channel);
+    await pc.setRemoteDescription({ type: 'offer', sdp: o.sdp });
+    await pc.setLocalDescription(await pc.createAnswer()); await waitIce(pc);
+    guestAnswer = 'IMG1:' + await pack({ sdp: pc.localDescription.sdp });
+    homeStep = 'guestwait'; homeRender(); setStatus('Waiting for the host to paste your reply code…');
+  } catch (e) { setStatus('That code did not work. Ask the host for a fresh one.'); console.error(e); }
+}
+
+// ---- the home screen ----
+const homeEl = document.getElementById('home');
+let homeStep = 'start', hostOffer = '', guestAnswer = '';
+function setStatus(t) { const el = document.getElementById('hm-status'); if (el) el.textContent = t; }
+function homeRender() {
+  const back = (to) => `<button class="hm-b ghost" data-h="go:${to}">← Back</button>`;
+  let h;
+  if (homeStep === 'start') h = `<div class="hm-logo">🏝️</div><h1>Island Settlement</h1><p>Build a nation. Make money. Rule the world.</p><button class="hm-b big" data-h="go:mode">▶ Start</button>`;
+  else if (homeStep === 'mode') h = `<h2>Choose a mode</h2><button class="hm-b" data-h="single">🧑 Single player<small>You against the bot nations</small></button><button class="hm-b" data-h="go:mp">👥 Multiplayer<small>You, a friend and the bots</small></button>${back('start')}`;
+  else if (homeStep === 'mp') h = `<h2>Multiplayer</h2><p>Two people, two devices, one world. No account or server needed — you swap two short codes.</p><button class="hm-b" data-h="go:host">🏠 Host a game<small>You make a code and send it to your friend</small></button><button class="hm-b" data-h="go:join">🔗 Join a game<small>Paste the code your friend sent you</small></button><p class="hm-note">Works best when both devices are online with a normal home or Wi-Fi connection. Some mobile or school networks block it.</p>${back('mode')}`;
+  else if (homeStep === 'host') h = `<h2>Host a game</h2><p><b>1.</b> Send this code to your friend:</p><textarea id="hm-code" readonly>${hostOffer || 'Creating your code…'}</textarea><button class="hm-b ghost" data-h="copy">📋 Copy code</button><p><b>2.</b> Your friend chooses Multiplayer → Join, pastes it, and sends you a reply code. Paste that here:</p><textarea id="hm-reply" placeholder="Paste the reply code"></textarea><button class="hm-b" data-h="connect" ${hostOffer ? '' : 'disabled'}>🔌 Connect</button><div class="hm-status" id="hm-status"></div>${back('mp')}`;
+  else if (homeStep === 'join') h = `<h2>Join a game</h2><p>Paste the code your friend (the host) sent you:</p><textarea id="hm-reply" placeholder="Paste the host's code"></textarea><button class="hm-b" data-h="joinbtn">🔗 Join</button><div class="hm-status" id="hm-status"></div>${back('mp')}`;
+  else h = `<h2>Almost there</h2><p>Send this reply code back to the host, then keep this page open:</p><textarea id="hm-code" readonly>${guestAnswer || 'Creating your reply…'}</textarea><button class="hm-b ghost" data-h="copy">📋 Copy reply code</button><div class="hm-status" id="hm-status"></div>`;
+  homeEl.innerHTML = `<div class="hm-card">${h}</div>`; homeEl.hidden = false;
+}
+homeEl.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-h]'); if (!el || el.disabled) return;
+  const a = el.dataset.h, val = () => { const t = document.getElementById('hm-reply'); return t ? t.value : ''; };
+  if (a.startsWith('go:')) {
+    homeStep = a.slice(3); homeRender();
+    if (homeStep === 'host' && !hostOffer) {
+      try { hostOffer = await hostCreate(); } catch (err) { console.error(err); hostOffer = ''; }
+      if (homeStep === 'host') { homeRender(); if (!hostOffer) setStatus('Could not create a code in this browser.'); }
+    }
+  } else if (a === 'single') { gameStarted = true; homeEl.hidden = true; startResolve('single'); }
+  else if (a === 'copy') {
+    const t = document.getElementById('hm-code'); if (!t) return; t.focus(); t.select();
+    try { await navigator.clipboard.writeText(t.value); setStatus('📋 Copied!'); } catch (err) { setStatus('Press and hold the code, then tap Copy.'); }
+  } else if (a === 'connect') {
+    setStatus('Connecting…');
+    try { await hostAccept(val()); setStatus('Connecting… (this can take a few seconds)'); } catch (err) { setStatus('That reply code did not work.'); }
+  } else if (a === 'joinbtn') {
+    setStatus('Checking the code…');
+    try {
+      const o = await unpack(val().trim().replace(/^IMH1:/, ''));
+      if (!o || !o.sdp || !o.seed) throw new Error('bad');
+      if (o.seed === WORLD_SEED) { guestStartSameWorld(val()); return; }
+      bootInto({ seed: o.seed, mp: { role: 'guest', code: val().trim() } });    // reloads into the host's world
+    } catch (err) { setStatus('That is not a valid host code.'); }
+  }
+});
+function guestStartSameWorld(code) { MP.role = 'guest'; player = P2; guestStart(code); }
+
+
 // start-up: AI nations begin with a few buildings (a loaded save brings its own)
 if (!BOOT) for (const c of aiCountries) { const cap = Math.max(3, Math.round(c.tiles.length * 0.03)); for (let i = 0; i < Math.ceil(cap * 0.4); i++) aiPlaceBuilding(c, ['house', 'house', 'lumber', 'market', 'tower'][(rand() * 5) | 0]); }
 
@@ -1930,7 +2230,7 @@ const HOVER_OWN = new THREE.Color(0x7dd3fc), HOVER_FOREIGN = new THREE.Color(0xf
 const tipEl = document.getElementById('tip'), toastEl = document.getElementById('toast');
 let hovered = -1, toastTimer = 0;
 const NAMES = { house: 'House', lumber: 'Lumber camp', market: 'Market', tower: 'Crystal tower' };
-function toast(msg) { toastEl.textContent = msg; toastEl.style.opacity = 1; clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.style.opacity = 0, 1800); }
+function toast(msg) { if (toastRoute) { toastRoute(msg); return; } toastEl.textContent = msg; toastEl.style.opacity = 1; clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.style.opacity = 0, 1800); }
 
 function updateHover(e) {
   const next = pickTile(e);
@@ -1957,25 +2257,7 @@ window.addEventListener('pointerup', (e) => {
   const tile = land[hovered];
   if (tile.country !== player.id) { selectCountry(tile.country, true); return; }
 
-  if (state.selectedTool === 'demolish') {
-    if (tile.building) {
-      applyBuilding(player, tile.buildingType, -1);
-      scene.remove(tile.building);
-      tile.building = null; tile.buildingType = null;
-      rebuildCrystals();
-      updateUI();
-    }
-    return;
-  }
-
-  if (tile.building) return;
-  const cost = BUILDINGS[state.selectedTool];
-  if (state.gold >= cost.gold && state.wood >= cost.wood) {
-    state.gold -= cost.gold; state.wood -= cost.wood;
-    applyBuilding(player, state.selectedTool, 1);
-    placeBuilding(tile, state.selectedTool);
-    updateUI();
-  } else toast('Not enough gold or wood');
+  if (netGuest()) netCmd({ c: 'build', i: tile.i, type: state.selectedTool }); else tryBuild(tile, state.selectedTool);
 });
 
 // Toolbar & UI
@@ -2109,7 +2391,10 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-if (BOOT) applySave(BOOT);
+if (BOOT && BOOT.c) applySave(BOOT);
+if (BOOT && BOOT.c) { gameStarted = true; homeEl.hidden = true; startResolve('single'); }
+else if (MP.role === 'guest') { homeStep = 'guestwait'; homeRender(); guestStart(BOOT.mp.code); }
+else homeRender();
 updateUI();
 animate();
 gameLive = true;
