@@ -111,6 +111,26 @@
   .hm-card textarea{width:100%;height:96px;box-sizing:border-box;background:#0b1224;color:#cbd5e1;border:1px solid #475569;border-radius:8px;font:11px monospace;padding:6px;margin:6px 0}
   .hm-status{min-height:18px;color:#fde047;font-size:13px;margin:6px 0}
   .hm-note{font-size:12px!important;color:#94a3b8!important}
+  /* device layouts: body.dev-pc / dev-ipad / dev-mobile (touch = ipad or mobile) */
+  body.touch #toolbar{left:12px;right:12px;bottom:12px;transform:none;max-width:none}
+  body.touch #minimap{bottom:calc(var(--tb,64px) + 22px)}
+  body.touch #home-btn{bottom:calc(var(--tb,64px) + 22px)}
+  body.touch #hint{display:none}
+  body.dev-mobile #country-header{gap:8px;padding:5px 8px;font-size:11px}
+  body.dev-mobile #country-header .stat{min-width:40px}
+  body.dev-mobile #country-header .stat b{font-size:14px}
+  body.dev-mobile #country-header small{font-size:9px}
+  body.dev-mobile #nation-name{width:96px;font-size:12px;padding:4px 6px}
+  body.dev-mobile #rank-badge{font-size:11px}
+  body.dev-mobile #menu button{padding:7px 9px;font-size:18px}
+  body.dev-mobile .lb{display:none}
+  body.dev-mobile #minimap{width:140px;height:82px}
+  body.dev-mobile .build-btn{padding:6px 7px;font-size:12px}
+  body.dev-mobile .build-btn small{display:none}
+  body.dev-mobile #home-btn{padding:7px 10px;font-size:12px}
+  body.dev-mobile #panel{left:8px;right:8px;width:auto}
+  body.dev-mobile .wz-grid{grid-template-columns:1fr}
+  .hm-dev{display:flex;gap:8px}.hm-dev .hm-b{margin:10px 0;padding:14px 6px;font-size:15px}.hm-dev .hm-b.on{background:#0284c7;border-color:#fde047}
 </style>
 <script>
 // Loader: pick a CDN that works, register the import map, then start the game module (so exported/offline-opened copies fail loudly instead of showing a blank blue screen)
@@ -162,14 +182,14 @@
   <div class="stat"><b id="inf-val">0</b><small>Influence</small></div>
   <div class="stat"><b id="mil-val">0</b><small>Military</small></div>
 </div>
-<div id="menu"><button data-tab="companies">🏢 Companies</button><button data-tab="military">🪖 Military</button><button data-tab="nations">🌍 Nations</button><button data-tab="log">📰 News</button><button data-tab="saves">💾 Saves</button><button data-tab="settings">⚙️ Settings</button></div></div>
+<div id="menu"><button data-tab="companies"><span>🏢</span><span class="lb"> Companies</span></button><button data-tab="military"><span>🪖</span><span class="lb"> Military</span></button><button data-tab="nations"><span>🌍</span><span class="lb"> Nations</span></button><button data-tab="log"><span>📰</span><span class="lb"> News</span></button><button data-tab="saves"><span>💾</span><span class="lb"> Saves</span></button><button data-tab="settings"><span>⚙️</span><span class="lb"> Settings</span></button></div></div>
 <div id="panel" hidden><div id="panel-head"><b id="panel-title"></b><button id="panel-close">✕</button></div><div id="panel-body"></div></div>
 <div id="wizard" hidden></div>
 <div id="home"></div>
 <div id="popup" hidden></div>
 <div id="tip"></div><div id="toast"></div>
 <div id="minimap"><canvas id="mm-canvas"></canvas><div id="mm-dot"></div></div>
-<div id="hint">Left-click a tile to build · drag to orbit · scroll to zoom</div>
+<div id="hint"></div>
 <div id="toolbar">
   <button class="build-btn active" data-type="house">🏠 House<small>30g 20w</small></button>
   <button class="build-btn" data-type="lumber">🪵 Lumber<small>40g 10w</small></button>
@@ -1353,6 +1373,7 @@ panelBody.addEventListener('click', (e) => {
   else if (act === 'fbsend') { sendFeedback(); return; }
   else if (act === 'fbcopy') { copyFeedback(); return; }
   else if (act === 'gohome') { goHome(); return; }
+  else if (act === 'device') { applyDevice(el.dataset.k); return; }
   else if (act === 'saveslot') { saveSlot(el.dataset.s).then(() => { if (tab === 'saves' && panelOpen) renderSaves(); }); return; }
   else if (act === 'loadslot') { const s = el.dataset.s; popup(`<b>📂 Load ${slotName(s)}?</b><br>Your current game is replaced (the autosave keeps the last 30 seconds).`, [{ label: 'Load', fn: () => loadSlot(s) }, { label: 'Cancel' }], 1e9); return; }
   else if (act === 'delslot') { const s = el.dataset.s; popup(`<b>🗑️ Delete ${slotName(s)}?</b>`, [{ label: 'Delete', fn: () => delSlot(s).then(() => { if (tab === 'saves' && panelOpen) renderSaves(); }) }, { label: 'Cancel' }], 1e9); return; }
@@ -1715,6 +1736,7 @@ function renderSettings() {
     h = `<div class="sub">Island Settlement · world seed ${WORLD_SEED}</div>
       <div class="row"><div class="ic">📝</div><div class="grow"><b>Feedback</b><br><small>Report a bug or share an idea</small></div>${btn('fbopen', 'Open')}</div>
       <div class="row"><div class="ic">⭐</div><div class="grow"><b>Rate this game</b><br><small>Opens the game's GitHub page — tap the ⭐ Star button there</small></div><a class="ab" href="${REPO_URL}" target="_blank" rel="noopener" style="text-decoration:none">Open</a></div>
+      <div class="row"><div class="ic">🖥️</div><div class="grow"><b>Device</b><br><small>Changes layout and controls</small><div class="sbtns wide">${Object.keys(DEVICES).map(k => `<button class="ab" data-act="device" data-k="${k}" style="${device === k ? 'border-color:#facc15;color:#fde047' : ''}">${DEVICES[k]}</button>`).join('')}</div></div></div>
       <div class="row"><div class="ic">🏠</div><div class="grow"><b>My country</b><br><small>Fly the camera back home (or press H)</small></div>${btn('gohome', 'Go')}</div>
       <div class="sub">Tip: use the 💾 Saves tab to keep your progress.</div>`;
   } else {
@@ -2159,6 +2181,25 @@ async function guestStart(hostCode) {
   } catch (e) { setStatus('That code did not work. Ask the host for a fresh one.'); console.error(e); }
 }
 
+// ---- device (PC / iPad / mobile): changes layout and the controls hint ----
+const DEVICES = { pc: '💻 PC', ipad: '📲 iPad', mobile: '📱 Mobile' };
+function detectDevice() {
+  try { const st = localStorage.getItem('island_device'); if (DEVICES[st]) return st; } catch (e) {}
+  const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  return !coarse ? 'pc' : (Math.min(window.innerWidth, window.innerHeight) < 600 ? 'mobile' : 'ipad');
+}
+let device = 'pc';
+function applyDevice(d) {
+  device = DEVICES[d] ? d : 'pc';
+  try { localStorage.setItem('island_device', device); } catch (e) {}
+  document.body.className = 'dev-' + device + (device === 'pc' ? '' : ' touch');
+  document.getElementById('hint').textContent = device === 'pc'
+    ? 'Click a tile to build · W A S D move the camera · drag to orbit · scroll to zoom · H = home'
+    : 'Tap a tile to build · drag to orbit · pinch to zoom · two fingers to move';
+  layout(); if (typeof panelOpen !== 'undefined' && panelOpen && tab === 'settings') renderSettings();
+}
+applyDevice(detectDevice());
+
 // ---- the home screen ----
 const homeEl = document.getElementById('home');
 let homeStep = 'start', hostOffer = '', guestAnswer = '';
@@ -2166,8 +2207,9 @@ function setStatus(t) { const el = document.getElementById('hm-status'); if (el)
 function homeRender() {
   const back = (to) => `<button class="hm-b ghost" data-h="go:${to}">← Back</button>`;
   let h;
-  if (homeStep === 'start') h = `<div class="hm-logo">🏝️</div><h1>Island Settlement</h1><p>Build a nation. Make money. Rule the world.</p><button class="hm-b big" data-h="go:mode">▶ Start</button>`;
-  else if (homeStep === 'mode') h = `<h2>Choose a mode</h2><button class="hm-b" data-h="single">🧑 Single player<small>You against the bot nations</small></button><button class="hm-b" data-h="go:mp">👥 Multiplayer<small>You, a friend and the bots</small></button>${back('start')}`;
+  if (homeStep === 'start') h = `<div class="hm-logo">🏝️</div><h1>Island Settlement</h1><p>Build a nation. Make money. Rule the world.</p><button class="hm-b big" data-h="go:device">▶ Start</button>`;
+  else if (homeStep === 'device') h = `<h2>What are you playing on?</h2><p>This sets the layout and controls.</p><div class="hm-dev">${Object.keys(DEVICES).map(k => `<button class="hm-b ${device === k ? 'on' : ''}" data-h="dev:${k}">${DEVICES[k]}<small>${k === 'pc' ? 'WASD to move' : k === 'ipad' ? 'Touch · big screen' : 'Touch · small screen'}</small></button>`).join('')}</div><button class="hm-b big" data-h="go:mode">Continue →</button>${back('start')}`;
+  else if (homeStep === 'mode') h = `<h2>Choose a mode</h2><button class="hm-b" data-h="single">🧑 Single player<small>You against the bot nations</small></button><button class="hm-b" data-h="go:mp">👥 Multiplayer<small>You, a friend and the bots</small></button>${back('device')}`;
   else if (homeStep === 'mp') h = `<h2>Multiplayer</h2><p>Two people, two devices, one world. No account or server needed — you swap two short codes.</p><button class="hm-b" data-h="go:host">🏠 Host a game<small>You make a code and send it to your friend</small></button><button class="hm-b" data-h="go:join">🔗 Join a game<small>Paste the code your friend sent you</small></button><p class="hm-note">Works best when both devices are online with a normal home or Wi-Fi connection. Some mobile or school networks block it.</p>${back('mode')}`;
   else if (homeStep === 'host') h = `<h2>Host a game</h2><p><b>1.</b> Send this code to your friend:</p><textarea id="hm-code" readonly>${hostOffer || 'Creating your code…'}</textarea><button class="hm-b ghost" data-h="copy">📋 Copy code</button><p><b>2.</b> Your friend chooses Multiplayer → Join, pastes it, and sends you a reply code. Paste that here:</p><textarea id="hm-reply" placeholder="Paste the reply code"></textarea><button class="hm-b" data-h="connect" ${hostOffer ? '' : 'disabled'}>🔌 Connect</button><div class="hm-status" id="hm-status"></div>${back('mp')}`;
   else if (homeStep === 'join') h = `<h2>Join a game</h2><p>Paste the code your friend (the host) sent you:</p><textarea id="hm-reply" placeholder="Paste the host's code"></textarea><button class="hm-b" data-h="joinbtn">🔗 Join</button><div class="hm-status" id="hm-status"></div>${back('mp')}`;
@@ -2177,6 +2219,7 @@ function homeRender() {
 homeEl.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-h]'); if (!el || el.disabled) return;
   const a = el.dataset.h, val = () => { const t = document.getElementById('hm-reply'); return t ? t.value : ''; };
+  if (a.startsWith('dev:')) { applyDevice(a.slice(4)); homeRender(); return; }
   if (a.startsWith('go:')) {
     homeStep = a.slice(3); homeRender();
     if (homeStep === 'host' && !hostOffer) {
@@ -2290,8 +2333,10 @@ function layoutNow() {
   const r = document.documentElement.style, tp = document.getElementById('topbar'), tb = document.getElementById('toolbar'), hb = document.getElementById('home-btn');
   r.setProperty('--top', Math.ceil(tp.getBoundingClientRect().bottom) + 'px');
   r.setProperty('--tb', tb.offsetHeight + 'px');
-  const narrow = window.innerWidth < 1200;
-  r.setProperty('--bot', ((narrow ? tb.offsetHeight + 12 : 14) + hb.offsetHeight + 8) + 'px');
+  const narrow = window.innerWidth < 1200 || document.body.classList.contains('touch');
+  const mmH = document.getElementById('minimap').offsetHeight;
+  const stackH = document.body.classList.contains('dev-mobile') ? Math.max(mmH, hb.offsetHeight) + 14 : hb.offsetHeight + 8;   // on phones the panel is full width, so it must clear the minimap too
+  r.setProperty('--bot', ((narrow ? tb.offsetHeight + 12 : 14) + stackH + (narrow ? 10 : 0)) + 'px');
 }
 window.addEventListener('resize', layout); window.addEventListener('orientationchange', () => setTimeout(layout, 200));
 layout();
