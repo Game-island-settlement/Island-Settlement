@@ -110,6 +110,8 @@
   .hm-b:disabled{opacity:.5}
   .hm-card textarea{width:100%;height:96px;box-sizing:border-box;background:#0b1224;color:#cbd5e1;border:1px solid #475569;border-radius:8px;font:11px monospace;padding:6px;margin:6px 0}
   .hm-status{min-height:18px;color:#fde047;font-size:13px;margin:6px 0}
+  .hm-code{font:800 34px ui-monospace,Menlo,monospace;letter-spacing:4px;color:#fde047;background:#0b1224;border:1px solid #475569;border-radius:12px;padding:14px 6px;margin:10px 0;user-select:all;-webkit-user-select:all}
+  .hm-in{width:100%;box-sizing:border-box;text-align:center;font:800 26px ui-monospace,Menlo,monospace;letter-spacing:4px;text-transform:uppercase;background:#0b1224;color:#fde047;border:1px solid #475569;border-radius:12px;padding:12px 6px;margin:10px 0}
   .hm-note{font-size:12px!important;color:#94a3b8!important}
   /* device layouts: body.dev-pc / dev-ipad / dev-mobile (touch = ipad or mobile) */
   body.touch #toolbar{left:12px;right:12px;bottom:12px;transform:none;max-width:none}
@@ -2181,6 +2183,95 @@ async function guestStart(hostCode) {
   } catch (e) { setStatus('That code did not work. Ask the host for a fresh one.'); console.error(e); }
 }
 
+
+// ---- short join codes: a free public PeerJS broker introduces the two devices (game data still flows device-to-device) ----
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const newCode = () => Array.from({ length: 10 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+const normCode = (t) => String(t || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const prettyCode = (c) => c ? c.slice(0, 5) + '-' + c.slice(5) : '…';
+function loadPeerJS() {
+  if (window.Peer) return Promise.resolve();
+  const urls = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];
+  return new Promise((res, rej) => {
+    const next = (i) => {
+      if (i >= urls.length) { rej(new Error('peerjs unavailable')); return; }
+      const sc = document.createElement('script'); sc.src = urls[i]; sc.onload = () => res(); sc.onerror = () => { sc.remove(); next(i + 1); };
+      document.head.appendChild(sc);
+    };
+    next(0);
+  });
+}
+// a PeerJS connection dressed up as the data-channel object the rest of the net code expects
+function peerAdapter(conn) {
+  const ad = { send: (m) => conn.send(m), get readyState() { return conn.open ? 'open' : 'closed'; }, bufferedAmount: 0, onmessage: null, onopen: null, onclose: null };
+  conn.on('close', () => { if (ad.onclose) ad.onclose(); });
+  conn.on('error', () => { if (ad.onclose) ad.onclose(); });
+  return ad;
+}
+let shortCode = '', hostPeer = null;
+async function startShortHost() {
+  MP.role = 'host'; blockAuto = true;
+  await loadPeerJS();
+  for (let tries = 0; tries < 5; tries++) {
+    const code = newCode();
+    const ok = await new Promise((res) => {
+      const peer = new Peer('isl-' + code, { config: ICE });
+      const to = setTimeout(() => { try { peer.destroy(); } catch (e) {} res(false); }, 12000);
+      peer.on('open', () => { clearTimeout(to); hostPeer = peer; res(true); });
+      peer.on('error', (e) => { clearTimeout(to); try { peer.destroy(); } catch (x) {} res(e && e.type === 'unavailable-id' ? null : false); });
+    });
+    if (ok) {
+      shortCode = code;
+      hostPeer.on('connection', (conn) => {
+        let ad = null;
+        conn.on('data', (d) => {
+          if (typeof d === 'string' && d.startsWith('HELLO:')) {
+            if (d === 'HELLO:probe') { conn.send('SEED:' + WORLD_SEED); setTimeout(() => { try { conn.close(); } catch (e) {} }, 2000); }
+            else if (d === 'HELLO:play' && !MP.open && !ad) { ad = peerAdapter(conn); wireChannel(ad); if (ad.onopen) ad.onopen(); }
+            return;
+          }
+          if (ad && ad.onmessage) ad.onmessage({ data: d });
+        });
+      });
+      return code;
+    }
+    if (ok === false) break;      // broker unreachable (null = that code was taken: try another)
+  }
+  throw new Error('no broker');
+}
+// guest: connect by short code. probe=true only asks which world the host is in.
+function peerConnect(code, hello) {
+  return new Promise(async (res, rej) => {
+    try { await loadPeerJS(); } catch (e) { rej(new Error('lib')); return; }
+    const peer = new Peer(undefined, { config: ICE });
+    const fail = (m) => { try { peer.destroy(); } catch (e) {} rej(new Error(m)); };
+    const to = setTimeout(() => fail('timeout'), 15000);
+    peer.on('error', (e) => { clearTimeout(to); fail(e && e.type === 'peer-unavailable' ? 'nogame' : 'error'); });
+    peer.on('open', () => {
+      const conn = peer.connect('isl-' + code, { reliable: true });
+      conn.on('open', () => { clearTimeout(to); conn.send(hello); res({ peer, conn }); });
+    });
+  });
+}
+async function guestProbe(code) {          // -> the host's world seed
+  const { peer, conn } = await peerConnect(code, 'HELLO:probe');
+  return new Promise((res, rej) => {
+    const to = setTimeout(() => { try { peer.destroy(); } catch (e) {} rej(new Error('timeout')); }, 10000);
+    conn.on('data', (d) => { if (typeof d === 'string' && d.startsWith('SEED:')) { clearTimeout(to); res(+d.slice(5)); try { conn.close(); peer.destroy(); } catch (e) {} } });
+  });
+}
+async function guestPlayShort(code) {
+  try {
+    MP.role = 'guest'; blockAuto = true;
+    const { conn } = await peerConnect(code, 'HELLO:play');
+    const ad = peerAdapter(conn); wireChannel(ad);
+    conn.on('data', (d) => { if (ad.onmessage) ad.onmessage({ data: d }); });
+    if (ad.onopen) ad.onopen();
+  } catch (e) {
+    console.error(e); homeStep = 'join'; homeRender(); setStatus('Could not reach that game. Check the code and try again.');
+  }
+}
+
 // ---- device (PC / iPad / mobile): changes layout and the controls hint ----
 const DEVICES = { pc: '💻 PC', ipad: '📲 iPad', mobile: '📱 Mobile' };
 function detectDevice() {
@@ -2210,9 +2301,12 @@ function homeRender() {
   if (homeStep === 'start') h = `<div class="hm-logo">🏝️</div><h1>Island Settlement</h1><p>Build a nation. Make money. Rule the world.</p><button class="hm-b big" data-h="go:device">▶ Start</button>`;
   else if (homeStep === 'device') h = `<h2>What are you playing on?</h2><p>This sets the layout and controls.</p><div class="hm-dev">${Object.keys(DEVICES).map(k => `<button class="hm-b ${device === k ? 'on' : ''}" data-h="dev:${k}">${DEVICES[k]}<small>${k === 'pc' ? 'WASD to move' : k === 'ipad' ? 'Touch · big screen' : 'Touch · small screen'}</small></button>`).join('')}</div><button class="hm-b big" data-h="go:mode">Continue →</button>${back('start')}`;
   else if (homeStep === 'mode') h = `<h2>Choose a mode</h2><button class="hm-b" data-h="single">🧑 Single player<small>You against the bot nations</small></button><button class="hm-b" data-h="go:mp">👥 Multiplayer<small>You, a friend and the bots</small></button>${back('device')}`;
-  else if (homeStep === 'mp') h = `<h2>Multiplayer</h2><p>Two people, two devices, one world. No account or server needed — you swap two short codes.</p><button class="hm-b" data-h="go:host">🏠 Host a game<small>You make a code and send it to your friend</small></button><button class="hm-b" data-h="go:join">🔗 Join a game<small>Paste the code your friend sent you</small></button><p class="hm-note">Works best when both devices are online with a normal home or Wi-Fi connection. Some mobile or school networks block it.</p>${back('mode')}`;
-  else if (homeStep === 'host') h = `<h2>Host a game</h2><p><b>1.</b> Send this code to your friend:</p><textarea id="hm-code" readonly>${hostOffer || 'Creating your code…'}</textarea><button class="hm-b ghost" data-h="copy">📋 Copy code</button><p><b>2.</b> Your friend chooses Multiplayer → Join, pastes it, and sends you a reply code. Paste that here:</p><textarea id="hm-reply" placeholder="Paste the reply code"></textarea><button class="hm-b" data-h="connect" ${hostOffer ? '' : 'disabled'}>🔌 Connect</button><div class="hm-status" id="hm-status"></div>${back('mp')}`;
-  else if (homeStep === 'join') h = `<h2>Join a game</h2><p>Paste the code your friend (the host) sent you:</p><textarea id="hm-reply" placeholder="Paste the host's code"></textarea><button class="hm-b" data-h="joinbtn">🔗 Join</button><div class="hm-status" id="hm-status"></div>${back('mp')}`;
+  else if (homeStep === 'mp') h = `<h2>Multiplayer</h2><p>Two people, two devices, one world. No account needed — you share one short code.</p><button class="hm-b" data-h="go:host">🏠 Host a game<small>You get a 10-letter code to give your friend</small></button><button class="hm-b" data-h="go:join">🔗 Join a game<small>Type the code your friend gave you</small></button><p class="hm-note">Works best when both devices are online with a normal home or Wi-Fi connection. Some mobile or school networks block it.</p>${back('mode')}`;
+  else if (homeStep === 'host') h = `<h2>Host a game</h2><p>Tell your friend this code:</p><div class="hm-code">${prettyCode(shortCode)}</div><button class="hm-b ghost" data-h="copyshort" ${shortCode ? '' : 'disabled'}>📋 Copy code</button><p>Your friend picks Multiplayer → Join and types it in. The game starts by itself when they connect.</p><div class="hm-status" id="hm-status">${shortCode ? 'Waiting for your friend…' : 'Making your code…'}</div><button class="hm-b ghost" data-h="go:hostlong">Not working? Use long codes instead</button>${back('mp')}`;
+  else if (homeStep === 'join') h = `<h2>Join a game</h2><p>Type the 10-letter code your friend gave you:</p><input class="hm-in" id="hm-join" maxlength="12" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX"><button class="hm-b" data-h="joinshort">🔗 Join</button><div class="hm-status" id="hm-status"></div><button class="hm-b ghost" data-h="go:joinlong">Have a long code instead?</button>${back('mp')}`;
+  else if (homeStep === 'hostlong') h = `<h2>Host (long codes)</h2><p><b>1.</b> Send this code to your friend:</p><textarea id="hm-code" readonly>${hostOffer || 'Creating your code…'}</textarea><button class="hm-b ghost" data-h="copy">📋 Copy code</button><p><b>2.</b> Your friend chooses Multiplayer → Join → long code, pastes it, and sends you a reply code. Paste that here:</p><textarea id="hm-reply" placeholder="Paste the reply code"></textarea><button class="hm-b" data-h="connect" ${hostOffer ? '' : 'disabled'}>🔌 Connect</button><div class="hm-status" id="hm-status"></div>${back('host')}`;
+  else if (homeStep === 'joinlong') h = `<h2>Join (long code)</h2><p>Paste the long code your friend (the host) sent you:</p><textarea id="hm-reply" placeholder="Paste the host's code"></textarea><button class="hm-b" data-h="joinbtn">🔗 Join</button><div class="hm-status" id="hm-status"></div>${back('join')}`;
+  else if (homeStep === 'guestshort') h = `<h2>Connecting…</h2><p>Joining your friend's game. This takes a few seconds.</p><div class="hm-status" id="hm-status">Connecting…</div>`;
   else h = `<h2>Almost there</h2><p>Send this reply code back to the host, then keep this page open:</p><textarea id="hm-code" readonly>${guestAnswer || 'Creating your reply…'}</textarea><button class="hm-b ghost" data-h="copy">📋 Copy reply code</button><div class="hm-status" id="hm-status"></div>`;
   homeEl.innerHTML = `<div class="hm-card">${h}</div>`; homeEl.hidden = false;
 }
@@ -2222,14 +2316,33 @@ homeEl.addEventListener('click', async (e) => {
   if (a.startsWith('dev:')) { applyDevice(a.slice(4)); homeRender(); return; }
   if (a.startsWith('go:')) {
     homeStep = a.slice(3); homeRender();
-    if (homeStep === 'host' && !hostOffer) {
-      try { hostOffer = await hostCreate(); } catch (err) { console.error(err); hostOffer = ''; }
-      if (homeStep === 'host') { homeRender(); if (!hostOffer) setStatus('Could not create a code in this browser.'); }
+    if (homeStep === 'host' && !shortCode) {
+      try { await startShortHost(); } catch (err) { console.error(err); shortCode = ''; }
+      if (homeStep === 'host') { homeRender(); if (!shortCode) setStatus('Could not reach the matchmaking service. Try “long codes” below.'); }
     }
-  } else if (a === 'single') { gameStarted = true; homeEl.hidden = true; startResolve('single'); }
+    if (homeStep === 'hostlong' && !hostOffer) {
+      try { hostOffer = await hostCreate(); } catch (err) { console.error(err); hostOffer = ''; }
+      if (homeStep === 'hostlong') { homeRender(); if (!hostOffer) setStatus('Could not create a code in this browser.'); }
+    }
+  } else if (a === 'single') {
+    if (hostPeer) { try { hostPeer.destroy(); } catch (err) {} hostPeer = null; shortCode = ''; }   // a solo game must not accept joiners
+    MP.role = null; gameStarted = true; homeEl.hidden = true; startResolve('single');
+  }
   else if (a === 'copy') {
     const t = document.getElementById('hm-code'); if (!t) return; t.focus(); t.select();
     try { await navigator.clipboard.writeText(t.value); setStatus('📋 Copied!'); } catch (err) { setStatus('Press and hold the code, then tap Copy.'); }
+  } else if (a === 'copyshort') {
+    try { await navigator.clipboard.writeText(shortCode); setStatus('📋 Copied!'); } catch (err) { setStatus('Press and hold the code to copy it.'); }
+  } else if (a === 'joinshort') {
+    const inp = document.getElementById('hm-join'), code = normCode(inp ? inp.value : '');
+    if (code.length < 6) { setStatus('Type the whole code first.'); return; }
+    if (code.length > 14) { setStatus('That looks like a long code — use “Have a long code instead?”'); return; }
+    setStatus('Looking for the game…');
+    try {
+      const seed = await guestProbe(code);
+      if (seed === WORLD_SEED) { MP.role = 'guest'; player = P2; homeStep = 'guestshort'; homeRender(); guestPlayShort(code); return; }
+      bootInto({ seed, mp: { role: 'guest', short: code } });    // reload into the host's world, then connect for real
+    } catch (err) { setStatus(err.message === 'nogame' ? 'No game found with that code.' : 'Could not connect. Check the code and your internet.'); }
   } else if (a === 'connect') {
     setStatus('Connecting…');
     try { await hostAccept(val()); setStatus('Connecting… (this can take a few seconds)'); } catch (err) { setStatus('That reply code did not work.'); }
@@ -2438,6 +2551,7 @@ window.addEventListener('resize', () => {
 
 if (BOOT && BOOT.c) applySave(BOOT);
 if (BOOT && BOOT.c) { gameStarted = true; homeEl.hidden = true; startResolve('single'); }
+else if (MP.role === 'guest' && BOOT.mp.short) { homeStep = 'guestshort'; homeRender(); guestPlayShort(BOOT.mp.short); }
 else if (MP.role === 'guest') { homeStep = 'guestwait'; homeRender(); guestStart(BOOT.mp.code); }
 else homeRender();
 updateUI();
